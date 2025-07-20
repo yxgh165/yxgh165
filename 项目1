@@ -1,0 +1,251 @@
+-- 黑色 OrionLib UI（坤坤大帝专版）
+local OrionLib = loadstring(game:HttpGet("https://raw.githubusercontent.com/wsomoQaz/lua-/main/Xcccc"))()
+
+-- 设置纯黑主题
+OrionLib.Themes.Default = {
+    Main    = Color3.fromRGB(20,20,20),
+    Second  = Color3.fromRGB(30,30,30),
+    Stroke  = Color3.fromRGB(50,50,50),
+    Divider = Color3.fromRGB(40,40,40),
+    Text    = Color3.fromRGB(255,255,255),
+    TextDark= Color3.fromRGB(200,200,200)
+}
+OrionLib.SelectedTheme = "Default"
+
+-- 主窗口
+local Window = OrionLib:MakeWindow({
+    IntroText = "坤坤大帝脚本",
+    Name = "坤坤大帝脚本 - " .. identifyexecutor(),
+    HidePremium = false,
+    SaveConfig = true,
+    ConfigFolder = "StitchConfig"
+})
+
+-- 公告 Tab
+local Tab1 = Window:MakeTab({Name = "公告", Icon = "rbxassetid://7733779610"})
+local function getDate() return os.date("%Y-%m-%d %H:%M") end
+local function getPlayer()
+    local p = game.Players.LocalPlayer
+    return {
+        ["用户名"]   = p.Name,
+        ["显示名"]   = p.DisplayName,
+        ["用户ID"]   = p.UserId,
+        ["注册天数"] = p.AccountAge,
+        ["当前游戏"] = game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId).Name
+    }
+end
+Tab1:AddLabel("📅 当前时间")
+Tab1:AddLabel(getDate())
+for k, v in pairs(getPlayer()) do
+    Tab1:AddLabel(k .. "： " .. tostring(v))
+end
+Tab1:AddButton({Name = "打印 QQ号", Callback = function() print("913348285") end})
+
+-- 移动加速 Tab（完整版，含夜视+飞行）
+local Tab4 = Window:MakeTab({Name = "人物功能", Icon = "rbxassetid://7733779610"})
+
+-- 获取人物模块
+local function getChar()
+    local p = game.Players.LocalPlayer
+    return p.Character or p.CharacterAdded:Wait()
+end
+local function getHum()
+    return getChar():WaitForChild("Humanoid", 3)
+end
+
+-- 基础调速
+Tab4:AddTextbox({
+    Name = "输入速度数值",
+    Default = "16",
+    Callback = function(txt)
+        local hum = getHum()
+        if hum then hum.WalkSpeed = tonumber(txt) or 16 end
+    end
+})
+Tab4:AddTextbox({
+    Name = "输入跳跃数值",
+    Default = "50",
+    Callback = function(txt)
+        local hum = getHum()
+        if hum then hum.JumpPower = tonumber(txt) or 50 end
+    end
+})
+Tab4:AddTextbox({
+    Name = "输入重力数值",
+    Default = "196",
+    Callback = function(txt)
+        workspace.Gravity = tonumber(txt) or 196
+    end
+})
+
+-- 夜视开关
+Tab4:AddToggle({
+    Name = "夜视模式",
+    Default = false,
+    Callback = function(v)
+        if v then
+            game.Lighting.Ambient = Color3.fromRGB(255,255,255)
+            game.Lighting.Brightness = 5
+            game.Lighting.GlobalShadows = false
+            OrionLib:MakeNotification({Name="提示", Content="夜视已开启", Time=2})
+        else
+            game.Lighting.Ambient = Color3.fromRGB(128,128,128)
+            game.Lighting.Brightness = 2
+            game.Lighting.GlobalShadows = true
+            OrionLib:MakeNotification({Name="提示", Content="夜视已关闭", Time=2})
+        end
+    end
+})
+
+-- 飞行开关
+local flyConn = {}
+Tab4:AddToggle({
+    Name = "飞行模式",
+    Default = false,
+    Callback = function(v)
+        local char = getChar()
+        local hrp = char:WaitForChild("HumanoidRootPart")
+        local hum = char:WaitForChild("Humanoid")
+        
+        -- 清理旧连接
+        for _,c in ipairs(flyConn) do c:Disconnect() end
+        flyConn = {}
+
+        if v then
+            hum.PlatformStand = true
+            local bg = Instance.new("BodyGyro")
+            bg.MaxTorque = Vector3.new(4000,4000,4000)
+            bg.P = 10000
+            bg.Parent = hrp
+
+            local bv = Instance.new("BodyVelocity")
+            bv.MaxForce = Vector3.new(5000,5000,5000)
+            bv.Velocity = Vector3.new(0,0,0)
+            bv.Parent = hrp
+
+            local UIS = game:GetService("UserInputService")
+            local speed = 50
+
+            local function onInput(inp, gpe)
+                if gpe then return end
+                local vec = Vector3.new(0,0,0)
+                if inp.UserInputType == Enum.UserInputType.Keyboard then
+                    local key = inp.KeyCode
+                    if key == Enum.KeyCode.W then vec = vec + hrp.CFrame.lookVector end
+                    if key == Enum.KeyCode.S then vec = vec - hrp.CFrame.lookVector end
+                    if key == Enum.KeyCode.A then vec = vec - hrp.CFrame.rightVector end
+                    if key == Enum.KeyCode.D then vec = vec + hrp.CFrame.rightVector end
+                    if key == Enum.KeyCode.Space then vec = vec + Vector3.new(0,1,0) end
+                    if key == Enum.KeyCode.LeftShift then vec = vec - Vector3.new(0,1,0) end
+                end
+                bv.Velocity = vec * speed
+            end
+
+            local function onEnd(inp)
+                if inp.UserInputType == Enum.UserInputType.Keyboard then
+                    local key = inp.KeyCode
+                    if key == Enum.KeyCode.W or key == Enum.KeyCode.S or
+                       key == Enum.KeyCode.A or key == Enum.KeyCode.D or
+                       key == Enum.KeyCode.Space or key == Enum.KeyCode.LeftShift then
+                        bv.Velocity = Vector3.new(0,0,0)
+                    end
+                end
+            end
+
+            table.insert(flyConn, UIS.InputBegan:Connect(onInput))
+            table.insert(flyConn, UIS.InputEnded:Connect(onEnd))
+
+            OrionLib:MakeNotification({Name="飞行提示", Content="飞行已开启\nWASD移动 空格上升 Shift下降", Time=3})
+        else
+            hum.PlatformStand = false
+            for _,obj in ipairs({"BodyGyro","BodyVelocity"}) do
+                if hrp:FindFirstChild(obj) then hrp[obj]:Destroy() end
+            end
+            OrionLib:MakeNotification({Name="飞行提示", Content="飞行已关闭", Time=2})
+        end
+    end
+})
+
+-- 穿墙开关
+local noclipConn
+Tab4:AddToggle({
+    Name = "穿墙模式",
+    Default = false,
+    Callback = function(v)
+        local char = getChar()
+        if v then
+            noclipConn = game:GetService("RunService").Stepped:Connect(function()
+                for _,p in ipairs(char:GetDescendants()) do
+                    if p:IsA("BasePart") then
+                        p.CanCollide = false
+                    end
+                end
+            end)
+            OrionLib:MakeNotification({Name="提示", Content="穿墙已开启", Time=2})
+        else
+            if noclipConn then noclipConn:Disconnect() end
+            OrionLib:MakeNotification({Name="提示", Content="穿墙已关闭", Time=2})
+        end
+    end
+})
+
+-- 删除游戏阴影开关
+Tab4:AddToggle({
+    Name = "删除阴影",
+    Default = false,
+    Callback = function(v)
+        if v then
+            game.Lighting.GlobalShadows = false
+            for _,l in ipairs(workspace:GetDescendants()) do
+                if l:IsA("BasePart") or l:IsA("MeshPart") then
+                    l.CastShadow = false
+                end
+            end
+            OrionLib:MakeNotification({Name="提示", Content="阴影已删除", Time=2})
+        else
+            game.Lighting.GlobalShadows = true
+            for _,l in ipairs(workspace:GetDescendants()) do
+                if l:IsA("BasePart") or l:IsA("MeshPart") then
+                    l.CastShadow = true
+                end
+            end
+            OrionLib:MakeNotification({Name="提示", Content="阴影已恢复", Time=2})
+        end
+    end
+})
+
+-- XA脚本 Tab
+local Tab2 = Window:MakeTab({Name = "XA脚本", Icon = "rbxassetid://7733779610"})
+Tab2:AddButton({Name = "XA HUB", Callback = function()
+    loadstring(game:HttpGet("https://xingtaiduan.pythonanywhere.com/Loader"))()
+end})
+
+--RB脚本中心 Tap
+local Tab3 = Window:MakeTab({Name = "RB脚本", Icon = "rbxassetid://7733779610"})
+Tab3:AddButton({Name = "Rb脚本", Callback = function()
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/Yungengxin/roblox/refs/heads/main/Rb-Hub"))()
+end})
+
+-- 生存与杀手 Tab
+local Tab4 = Window:MakeTab({Name = "生存与杀手", Icon = "rbxassetid://7733779610"})
+Tab4:AddButton({Name = "生存与杀手", Callback = function()
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/Milan08Studio/ChairWare/main/main.lua"))()
+end})
+
+local Tab5 = Window:MakeTab({Name = "爱德华", Icon = "rbxassetid://7733779610"})
+Tab5:AddButton({Name = "爱德华", Callback = function()
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/gumanba/Scripts/main/Edward"))()
+end})
+
+local Tab6 = Window:MakeTab({Name = "活了7天", Icon = "rbxassetid://7733779610"})
+Tab6:AddButton({Name = "活了7天", Callback = function()
+    loadstring(game:HttpGet("https://rawscripts.net/raw/Universal-Script-7-days-to-live-36824"))()
+end})
+
+local Tab7 = Window:MakeTab({Name = "死铁轨", Icon = "rbxassetid://7733779610"})
+Tab7:AddButton({Name = "死铁轨", Callback = function()
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/iopjklbnmsss/SansHubScript/refs/heads/main/SansHub"))()
+end})
+
+-- 启动
+OrionLib:Init()
