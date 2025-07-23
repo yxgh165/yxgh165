@@ -1,7 +1,10 @@
--- 黑色 OrionLib UI（坤坤大帝专版）
+-- ① 强制 200×200 居中窗口
+getgenv().WindowSize = UDim2.new(0, 200, 0, 200)
+
+-- 黑色 OrionLib UI（坤坤大帝专版 + 锁定移速跳跃 + 简单玩家 ESP + NPC 透视）
 local OrionLib = loadstring(game:HttpGet("https://raw.githubusercontent.com/wsomoQaz/lua-/main/Xcccc"))()
 
--- 设置纯黑主题
+-- 纯黑主题
 OrionLib.Themes.Default = {
     Main    = Color3.fromRGB(20,20,20),
     Second  = Color3.fromRGB(30,30,30),
@@ -39,211 +42,489 @@ Tab1:AddLabel(getDate())
 for k, v in pairs(getPlayer()) do
     Tab1:AddLabel(k .. "： " .. tostring(v))
 end
-Tab1:AddButton({Name = "打印 QQ号", Callback = function() print("913348285") end})
+Tab1:AddButton({Name = "打印 QQ号", Callback = function() print("913348285") end
+})
 
--- 移动加速 Tab（完整版，含夜视+飞行）
+-- 确保你前面有这行（放在 OrionLib 初始化后）
 local Tab4 = Window:MakeTab({Name = "人物功能", Icon = "rbxassetid://7733779610"})
 
--- 获取人物模块
-local function getChar()
-    local p = game.Players.LocalPlayer
-    return p.Character or p.CharacterAdded:Wait()
+-----------------------------------------------------------------
+-- ⑤ 双独立 FOV（白跟随 + 橙固定）都参与瞄准判定
+-----------------------------------------------------------------
+-- 通用参数
+local aimbotEnabled      = false
+local aimbotSmooth       = 0.35
+local aimbotBone         = "Head"
+local aimbotPrediction   = 0.12
+local aimbotDelay        = 0.08
+local aimbotCheckTeam    = true
+local lastFire = 0
+local aimbotConn
+
+-- 缺失变量一次性补全
+local Camera = workspace.CurrentCamera
+local UserInputService = game:GetService("UserInputService")
+
+-- 1. 跟随鼠标 FOV
+local mouseFOV      = 120
+local mouseFovCircle = Drawing.new("Circle")
+mouseFovCircle.NumSides  = 64
+mouseFovCircle.Radius    = mouseFOV
+mouseFovCircle.Thickness = 1.5
+mouseFovCircle.Color     = Color3.fromRGB(255,255,255)
+mouseFovCircle.Filled    = false
+mouseFovCircle.Visible   = false
+
+-- 2. 固定中心 FOV
+local fixedFOV      = 90
+local fixedFovCircle = Drawing.new("Circle")
+fixedFovCircle.NumSides  = 64
+fixedFovCircle.Radius    = fixedFOV
+fixedFovCircle.Thickness = 1.5
+fixedFovCircle.Color     = Color3.fromRGB(255,165,0)
+fixedFovCircle.Filled    = false
+fixedFovCircle.Visible   = false
+
+-- 固定圆中心一次设置
+local function setFixedCenter()
+    local center = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
+    fixedFovCircle.Position = center
 end
-local function getHum()
-    return getChar():WaitForChild("Humanoid", 3)
+Camera:GetPropertyChangedSignal("ViewportSize"):Connect(setFixedCenter)
+setFixedCenter()
+
+-- 工具函数
+local function getAimPos(character)
+    if not character then return nil end
+    local root = character:FindFirstChild("HumanoidRootPart")
+    local bone = character:FindFirstChild(aimbotBone) or character:FindFirstChild("Head")
+    if not (root and bone) then return nil end
+    return bone.Position + root.Velocity * aimbotPrediction
 end
 
--- 基础调速
-Tab4:AddTextbox({
-    Name = "输入速度数值",
-    Default = "16",
-    Callback = function(txt)
-        local hum = getHum()
-        if hum then hum.WalkSpeed = tonumber(txt) or 16 end
-    end
-})
-Tab4:AddTextbox({
-    Name = "输入跳跃数值",
-    Default = "50",
-    Callback = function(txt)
-        local hum = getHum()
-        if hum then hum.JumpPower = tonumber(txt) or 50 end
-    end
-})
-Tab4:AddTextbox({
-    Name = "输入重力数值",
-    Default = "196",
-    Callback = function(txt)
-        workspace.Gravity = tonumber(txt) or 196
-    end
-})
+local function isVisible(pos, ignore)
+    local ray = Ray.new(Camera.CFrame.Position, (pos - Camera.CFrame.Position).Unit * 5000)
+    local part = workspace:FindPartOnRayWithIgnoreList(ray, ignore or {})
+    return not part or part:IsDescendantOf(game.Players.LocalPlayer.Character)
+end
 
--- 夜视开关
-Tab4:AddToggle({
-    Name = "夜视模式",
+-- 判定是否在任一 FOV
+local function inAnyFOV(worldPos)
+    -- 跟随圆
+    if mouseFovCircle.Visible then
+        local sp = Camera:WorldToViewportPoint(worldPos)
+        local m  = UserInputService:GetMouseLocation()
+        if (Vector2.new(sp.X, sp.Y) - m).Magnitude <= mouseFOV then
+            return true
+        end
+    end
+    -- 固定圆
+    if fixedFovCircle.Visible then
+        local sp = Camera:WorldToViewportPoint(worldPos)
+        local c  = fixedFovCircle.Position
+        if (Vector2.new(sp.X, sp.Y) - c).Magnitude <= fixedFOV then
+            return true
+        end
+    end
+    return false
+end
+
+-- 取最近目标（以固定中心为基准）
+local function getClosest()
+    local closest, minDist = nil, math.huge
+    local center = fixedFovCircle.Position
+    for _, plr in ipairs(game.Players:GetPlayers()) do
+        if plr == game.Players.LocalPlayer then continue end
+        if aimbotCheckTeam and plr.Team and plr.Team == game.Players.LocalPlayer.Team then continue end
+        local char = plr.Character
+        local aimPos = getAimPos(char)
+        if not aimPos then continue end
+        if not inAnyFOV(aimPos) then continue end
+        if not isVisible(aimPos, {game.Players.LocalPlayer.Character}) then continue end
+        local sp = Camera:WorldToViewportPoint(aimPos)
+        local dist = (Vector2.new(sp.X, sp.Y) - center).Magnitude
+        if dist < minDist then
+            minDist, closest = dist, plr
+        end
+    end
+    return closest
+end
+
+-- 主循环
+local function startAimbot()
+    if aimbotConn then return end
+    aimbotConn = game:GetService("RunService").RenderStepped:Connect(function()
+        if not aimbotEnabled then return end
+        -- 更新跟随圆
+        mouseFovCircle.Position = UserInputService:GetMouseLocation()
+
+        local target = getClosest()
+        if not target then return end
+        local aimPos = getAimPos(target.Character)
+        if not aimPos then return end
+
+        local targetCFrame = CFrame.new(Camera.CFrame.Position, Camera.CFrame.Position + (aimPos - Camera.CFrame.Position).Unit)
+        Camera.CFrame = Camera.CFrame:Lerp(targetCFrame, 1 - aimbotSmooth)
+
+        if tick() - lastFire > aimbotDelay then
+            mouse1press(); task.wait(); mouse1release()
+            lastFire = tick()
+        end
+    end)
+end
+
+local function stopAimbot()
+    if aimbotConn then aimbotConn:Disconnect(); aimbotConn = nil end
+    mouseFovCircle.Visible = false
+    fixedFovCircle.Visible = false
+end
+
+-----------------------------------------------------------------
+-- UI 构建
+-----------------------------------------------------------------
+local aimbotSec = Tab4:AddSection({Name = "AI-Aimbot"})
+aimbotSec:AddToggle({
+    Name = "启用 Aimbot",
     Default = false,
     Callback = function(v)
-        if v then
-            game.Lighting.Ambient = Color3.fromRGB(255,255,255)
-            game.Lighting.Brightness = 5
-            game.Lighting.GlobalShadows = false
-            OrionLib:MakeNotification({Name="提示", Content="夜视已开启", Time=2})
-        else
-            game.Lighting.Ambient = Color3.fromRGB(128,128,128)
-            game.Lighting.Brightness = 2
-            game.Lighting.GlobalShadows = true
-            OrionLib:MakeNotification({Name="提示", Content="夜视已关闭", Time=2})
+        aimbotEnabled = v
+        if v then startAimbot() else stopAimbot() end
+    end
+})
+aimbotSec:AddToggle({
+    Name = "仅瞄准敌人",
+    Default = aimbotCheckTeam,
+    Callback = function(v) aimbotCheckTeam = v end
+})
+
+-- 跟随鼠标 FOV
+local mouseSec = Tab4:AddSection({Name = "跟随鼠标 FOV"})
+local mouseTog = mouseSec:AddToggle({
+    Name = "显示跟随FOV",
+    Default = false,
+    Callback = function(v) mouseFovCircle.Visible = v end
+})
+local mouseSlider = mouseSec:AddSlider({
+    Name = "半径（滑条）",
+    Min = 0, Max = 500, Default = mouseFOV, Increment = 5,
+    Callback = function(v)
+        mouseFOV = v
+        mouseFovCircle.Radius = v
+    end
+})
+mouseSec:AddTextbox({
+    Name = "半径（输入）",
+    Default = tostring(mouseFOV),
+    Callback = function(txt)
+        local n = tonumber(txt)
+        if n then
+            mouseFOV = n
+            mouseFovCircle.Radius = n
+            mouseSlider:Set(n)
         end
     end
 })
 
--- 飞行开关
-local flyConn = {}
-Tab4:AddToggle({
-    Name = "飞行模式",
+-- 固定中心 FOV
+local fixedSec = Tab4:AddSection({Name = "固定中心 FOV"})
+local fixedTog = fixedSec:AddToggle({
+    Name = "显示固定FOV",
     Default = false,
+    Callback = function(v) fixedFovCircle.Visible = v end
+})
+local fixedSlider = fixedSec:AddSlider({
+    Name = "半径（滑条）",
+    Min = 0, Max = 500, Default = fixedFOV, Increment = 5,
     Callback = function(v)
-        local char = getChar()
-        local hrp = char:WaitForChild("HumanoidRootPart")
-        local hum = char:WaitForChild("Humanoid")
-        
-        -- 清理旧连接
-        for _,c in ipairs(flyConn) do c:Disconnect() end
-        flyConn = {}
-
-        if v then
-            hum.PlatformStand = true
-            local bg = Instance.new("BodyGyro")
-            bg.MaxTorque = Vector3.new(4000,4000,4000)
-            bg.P = 10000
-            bg.Parent = hrp
-
-            local bv = Instance.new("BodyVelocity")
-            bv.MaxForce = Vector3.new(5000,5000,5000)
-            bv.Velocity = Vector3.new(0,0,0)
-            bv.Parent = hrp
-
-            local UIS = game:GetService("UserInputService")
-            local speed = 50
-
-            local function onInput(inp, gpe)
-                if gpe then return end
-                local vec = Vector3.new(0,0,0)
-                if inp.UserInputType == Enum.UserInputType.Keyboard then
-                    local key = inp.KeyCode
-                    if key == Enum.KeyCode.W then vec = vec + hrp.CFrame.lookVector end
-                    if key == Enum.KeyCode.S then vec = vec - hrp.CFrame.lookVector end
-                    if key == Enum.KeyCode.A then vec = vec - hrp.CFrame.rightVector end
-                    if key == Enum.KeyCode.D then vec = vec + hrp.CFrame.rightVector end
-                    if key == Enum.KeyCode.Space then vec = vec + Vector3.new(0,1,0) end
-                    if key == Enum.KeyCode.LeftShift then vec = vec - Vector3.new(0,1,0) end
-                end
-                bv.Velocity = vec * speed
-            end
-
-            local function onEnd(inp)
-                if inp.UserInputType == Enum.UserInputType.Keyboard then
-                    local key = inp.KeyCode
-                    if key == Enum.KeyCode.W or key == Enum.KeyCode.S or
-                       key == Enum.KeyCode.A or key == Enum.KeyCode.D or
-                       key == Enum.KeyCode.Space or key == Enum.KeyCode.LeftShift then
-                        bv.Velocity = Vector3.new(0,0,0)
-                    end
-                end
-            end
-
-            table.insert(flyConn, UIS.InputBegan:Connect(onInput))
-            table.insert(flyConn, UIS.InputEnded:Connect(onEnd))
-
-            OrionLib:MakeNotification({Name="飞行提示", Content="飞行已开启\nWASD移动 空格上升 Shift下降", Time=3})
-        else
-            hum.PlatformStand = false
-            for _,obj in ipairs({"BodyGyro","BodyVelocity"}) do
-                if hrp:FindFirstChild(obj) then hrp[obj]:Destroy() end
-            end
-            OrionLib:MakeNotification({Name="飞行提示", Content="飞行已关闭", Time=2})
+        fixedFOV = v
+        fixedFovCircle.Radius = v
+    end
+})
+fixedSec:AddTextbox({
+    Name = "半径（输入）",
+    Default = tostring(fixedFOV),
+    Callback = function(txt)
+        local n = tonumber(txt)
+        if n then
+            fixedFOV = n
+            fixedFovCircle.Radius = n
+            fixedSlider:Set(n)
         end
     end
 })
 
--- 穿墙开关
-local noclipConn
-Tab4:AddToggle({
-    Name = "穿墙模式",
-    Default = false,
-    Callback = function(v)
-        local char = getChar()
-        if v then
-            noclipConn = game:GetService("RunService").Stepped:Connect(function()
-                for _,p in ipairs(char:GetDescendants()) do
-                    if p:IsA("BasePart") then
-                        p.CanCollide = false
-                    end
-                end
-            end)
-            OrionLib:MakeNotification({Name="提示", Content="穿墙已开启", Time=2})
-        else
-            if noclipConn then noclipConn:Disconnect() end
-            OrionLib:MakeNotification({Name="提示", Content="穿墙已关闭", Time=2})
-        end
+-- 其余通用参数（平滑、预测、延迟、骨骼）
+local commonSec = Tab4:AddSection({Name = "通用参数"})
+local smoothSlider = commonSec:AddSlider({
+    Name = "平滑系数（滑条）",
+    Min = 0, Max = 1, Default = aimbotSmooth, Increment = 0.01,
+    Callback = function(v) aimbotSmooth = v end
+})
+commonSec:AddTextbox({
+    Name = "平滑系数（输入）",
+    Default = tostring(aimbotSmooth),
+    Callback = function(txt)
+        local n = tonumber(txt)
+        if n then aimbotSmooth = n; smoothSlider:Set(n) end
     end
 })
 
--- 删除游戏阴影开关
+local predSlider = commonSec:AddSlider({
+    Name = "预测 (秒)（滑条）",
+    Min = 0, Max = 1, Default = aimbotPrediction, Increment = 0.01,
+    Callback = function(v) aimbotPrediction = v end
+})
+commonSec:AddTextbox({
+    Name = "预测 (秒)（输入）",
+    Default = tostring(aimbotPrediction),
+    Callback = function(txt)
+        local n = tonumber(txt)
+        if n then aimbotPrediction = n; predSlider:Set(n) end
+    end
+})
+
+local delaySlider = commonSec:AddSlider({
+    Name = "开火延迟 (秒)（滑条）",
+    Min = 0, Max = 1, Default = aimbotDelay, Increment = 0.01,
+    Callback = function(v) aimbotDelay = v end
+})
+commonSec:AddTextbox({
+    Name = "开火延迟 (秒)（输入）",
+    Default = tostring(aimbotDelay),
+    Callback = function(txt)
+        local n = tonumber(txt)
+        if n then aimbotDelay = n; delaySlider:Set(n) end
+    end
+})
+
+commonSec:AddDropdown({
+    Name = "瞄准骨骼",
+    Default = aimbotBone,
+    Options = {"Head","Neck","UpperTorso","HumanoidRootPart"},
+    Callback = function(v) aimbotBone = v end
+})
+
+-----------------------------------------------------------------
+-- ⑥ 删除阴影（全局开关）
+-----------------------------------------------------------------
 Tab4:AddToggle({
     Name = "删除阴影",
     Default = false,
     Callback = function(v)
-        if v then
-            game.Lighting.GlobalShadows = false
-            for _,l in ipairs(workspace:GetDescendants()) do
-                if l:IsA("BasePart") or l:IsA("MeshPart") then
-                    l.CastShadow = false
-                end
+        game.Lighting.GlobalShadows = not v
+        for _, l in ipairs(workspace:GetDescendants()) do
+            if l:IsA("BasePart") or l:IsA("MeshPart") then
+                l.CastShadow = not v
             end
-            OrionLib:MakeNotification({Name="提示", Content="阴影已删除", Time=2})
-        else
-            game.Lighting.GlobalShadows = true
-            for _,l in ipairs(workspace:GetDescendants()) do
-                if l:IsA("BasePart") or l:IsA("MeshPart") then
-                    l.CastShadow = true
-                end
-            end
-            OrionLib:MakeNotification({Name="提示", Content="阴影已恢复", Time=2})
         end
+        OrionLib:MakeNotification({Name = "提示", Content = v and "阴影已删除" or "阴影已恢复", Time = 2})
     end
 })
 
+-----------------------------------------------------------------
+-- ⑦ 简单飞行（空格上升，Ctrl下降）
+-----------------------------------------------------------------
+local flyEnabled = false
+local flySpeed = 50
+local flyConn
+local flyRoot
+
+local function startFly()
+    if flyConn then return end
+    flyRoot = game.Players.LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if not flyRoot then return end
+    flyConn = game:GetService("RunService").Heartbeat:Connect(function(dt)
+        local vel = Vector3.new()
+        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then vel = vel + Vector3.new(0,  flySpeed * dt, 0) end
+        if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then vel = vel + Vector3.new(0, -flySpeed * dt, 0) end
+        flyRoot.Velocity = vel
+    end)
+end
+
+local function stopFly()
+    if flyConn then flyConn:Disconnect(); flyConn = nil end
+end
+
+Tab4:AddToggle({Name = "飞行", Default = false, Callback = function(v)
+    flyEnabled = v
+    if v then startFly() else stopFly() end
+end})
+
+-----------------------------------------------------------------
+-- ⑧ 玩家 ESP（含队伍检测）
+-----------------------------------------------------------------
+local espEnabled = false
+local espObjects = {}
+local function clearESP()
+    for _, o in ipairs(espObjects) do o:Remove() end
+    table.clear(espObjects)
+end
+local function getTeamColor(plr)
+    return plr.Team == game.Players.LocalPlayer.Team and Color3.fromRGB(0,255,0) or Color3.fromRGB(255,0,0)
+end
+
+local function drawESP()
+    clearESP()
+    if not espEnabled then return end
+    for _, plr in ipairs(game.Players:GetPlayers()) do
+        if plr == game.Players.LocalPlayer then continue end
+        local char = plr.Character
+        if not char then continue end
+        local root = char:FindFirstChild("HumanoidRootPart")
+        local head = char:FindFirstChild("Head")
+        if not (root and head) then continue end
+
+        local top, topVis = Camera:WorldToViewportPoint(head.Position + Vector3.new(0,1.5,0))
+        local bottom, botVis = Camera:WorldToViewportPoint(root.Position - Vector3.new(0,2.5,0))
+        if not (topVis and botVis) then continue end
+
+        local h = math.abs(top.Y - bottom.Y)
+        local w, l, r = h * 0.5, top.X - h * 0.25, top.X + h * 0.25
+        local color = getTeamColor(plr)
+
+        local box = Drawing.new("Quad")
+        box.Visible, box.Color, box.Thickness = true, color, 1
+        box.PointA, box.PointB = Vector2.new(l, top.Y), Vector2.new(r, top.Y)
+        box.PointC, box.PointD = Vector2.new(r, bottom.Y), Vector2.new(l, bottom.Y)
+        table.insert(espObjects, box)
+
+        local txt = Drawing.new("Text")
+        txt.Visible, txt.Center, txt.Outline = true, true, true
+        txt.Position = Vector2.new(top.X, top.Y - 20)
+        txt.Size, txt.Color = 18, color
+        txt.Text = plr.Name .. " [" .. math.floor((root.Position - Camera.CFrame.Position).Magnitude) .. "m]"
+        table.insert(espObjects, txt)
+    end
+end
+
+Tab4:AddToggle({Name = "极简玩家 ESP", Default = false, Callback = function(v)
+    espEnabled = v
+    while espEnabled do
+        drawESP()
+        task.wait(0.03)
+    end
+    clearESP()
+end})
+
+-----------------------------------------------------------------
+-- ⑨ NPC 透视
+-----------------------------------------------------------------
+local npcEspEnabled = false
+local npcEspObjects = {}
+local function clearNPCEsp()
+    for _, o in ipairs(npcEspObjects) do o:Remove() end
+    table.clear(npcEspObjects)
+end
+local function drawNPCEsp()
+    clearNPCEsp()
+    if not npcEspEnabled then return end
+    for _, model in ipairs(workspace:GetDescendants()) do
+        if model:IsA("Model") and model:FindFirstChildOfClass("Humanoid") and not game.Players:GetPlayerFromCharacter(model) then
+            local root = model:FindFirstChild("HumanoidRootPart") or model:FindFirstChild("Torso")
+            local head = model:FindFirstChild("Head")
+            if not (root and head) then continue end
+
+            local top, topVis = Camera:WorldToViewportPoint(head.Position + Vector3.new(0,1.5,0))
+            local bottom, botVis = Camera:WorldToViewportPoint(root.Position - Vector3.new(0,2.5,0))
+            if not (topVis and botVis) then continue end
+
+            local h = math.abs(top.Y - bottom.Y)
+            local w, l, r = h * 0.5, top.X - h * 0.25, top.X + h * 0.25
+            local color = Color3.fromRGB(255, 165, 0)
+
+            local box = Drawing.new("Quad")
+            box.Visible, box.Color, box.Thickness = true, color, 1
+            box.PointA, box.PointB = Vector2.new(l, top.Y), Vector2.new(r, top.Y)
+            box.PointC, box.PointD = Vector2.new(r, bottom.Y), Vector2.new(l, bottom.Y)
+            table.insert(npcEspObjects, box)
+
+            local txt = Drawing.new("Text")
+            txt.Visible, txt.Center, txt.Outline = true, true, true
+            txt.Position = Vector2.new(top.X, top.Y - 20)
+            txt.Size, txt.Color = 18, color
+            txt.Text = model.Name .. " [" .. math.floor((root.Position - Camera.CFrame.Position).Magnitude) .. "m]"
+            table.insert(npcEspObjects, txt)
+        end
+    end
+end
+
+Tab4:AddToggle({Name = "NPC 透视", Default = false, Callback = function(v)
+    npcEspEnabled = v
+    while npcEspEnabled do
+        drawNPCEsp()
+        task.wait(0.03)
+    end
+    clearNPCEsp()
+end})
+
+-----------------------------------------------------------------
+-- ⑩ 三锁定：移速 / 跳跃 / 重力
+-----------------------------------------------------------------
+local lockSpeed, lockJump, lockGrav = false, false, false
+local savedSpeed, savedJump, savedGrav = 16, 50, 196
+
+local function applyValues()
+    local char = game.Players.LocalPlayer.Character or game.Players.LocalPlayer.CharacterAdded:Wait()
+    local hum = char:WaitForChild("Humanoid", 3)
+    if lockSpeed then hum.WalkSpeed = savedSpeed end
+    if lockJump then hum.JumpPower = savedJump end
+    if lockGrav then workspace.Gravity = savedGrav end
+end
+game.Players.LocalPlayer.CharacterAdded:Connect(function()
+    task.wait(.1)
+    applyValues()
+end)
+
+-- 输入框 + 开关
+local lockSec = Tab4:AddSection({Name = "三锁定"})
+lockSec:AddTextbox({Name = "设定移速（仅保存值）", Default = tostring(savedSpeed), Callback = function(txt) savedSpeed = tonumber(txt) or 16 end})
+lockSec:AddTextbox({Name = "设定跳跃高度（仅保存值）", Default = tostring(savedJump), Callback = function(txt) savedJump = tonumber(txt) or 50 end})
+lockSec:AddTextbox({Name = "设定重力值（仅保存值）", Default = tostring(savedGrav), Callback = function(txt) savedGrav = tonumber(txt) or 196 end})
+
+lockSec:AddToggle({Name = "锁定移速", Default = false, Callback = function(v) lockSpeed = v; applyValues() end})
+lockSec:AddToggle({Name = "锁定跳跃", Default = false, Callback = function(v) lockJump = v; applyValues() end})
+lockSec:AddToggle({Name = "锁定重力", Default = false, Callback = function(v) lockGrav = v; applyValues() end})
+
+
+--控制台 Tap
+local Tab2 = Window:MakeTab({Name = "控制台", Icon = "rbxassetid://7733779610"})
+Tab2:AddButton({Name = "控制台", Callback = function()
+    loadstring(game:HttpGet("https://pastebin.com/raw/HfCtLtt9"))()
+end})
+
 -- XA脚本 Tab
-local Tab2 = Window:MakeTab({Name = "XA脚本", Icon = "rbxassetid://7733779610"})
-Tab2:AddButton({Name = "XA HUB", Callback = function()
+local Tab3 = Window:MakeTab({Name = "XA脚本", Icon = "rbxassetid://7733779610"})
+Tab3:AddButton({Name = "XA HUB", Callback = function()
     loadstring(game:HttpGet("https://xingtaiduan.pythonanywhere.com/Loader"))()
 end})
 
 --RB脚本中心 Tap
-local Tab3 = Window:MakeTab({Name = "RB脚本", Icon = "rbxassetid://7733779610"})
-Tab3:AddButton({Name = "Rb脚本", Callback = function()
+local Tab4 = Window:MakeTab({Name = "RB脚本", Icon = "rbxassetid://7733779610"})
+Tab4:AddButton({Name = "Rb脚本", Callback = function()
     loadstring(game:HttpGet("https://raw.githubusercontent.com/Yungengxin/roblox/refs/heads/main/Rb-Hub"))()
 end})
 
 -- 生存与杀手 Tab
-local Tab4 = Window:MakeTab({Name = "生存与杀手", Icon = "rbxassetid://7733779610"})
-Tab4:AddButton({Name = "生存与杀手", Callback = function()
+local Tab5 = Window:MakeTab({Name = "生存与杀手", Icon = "rbxassetid://7733779610"})
+Tab5:AddButton({Name = "生存与杀手", Callback = function()
     loadstring(game:HttpGet("https://raw.githubusercontent.com/Milan08Studio/ChairWare/main/main.lua"))()
 end})
 
-local Tab5 = Window:MakeTab({Name = "爱德华", Icon = "rbxassetid://7733779610"})
-Tab5:AddButton({Name = "爱德华", Callback = function()
+--爱德华
+local Tab6 = Window:MakeTab({Name = "爱德华", Icon = "rbxassetid://7733779610"})
+Tab6:AddButton({Name = "爱德华", Callback = function()
     loadstring(game:HttpGet("https://raw.githubusercontent.com/gumanba/Scripts/main/Edward"))()
 end})
 
-local Tab6 = Window:MakeTab({Name = "活了7天", Icon = "rbxassetid://7733779610"})
-Tab6:AddButton({Name = "活了7天", Callback = function()
+--活了7天
+local Tab7 = Window:MakeTab({Name = "活了7天", Icon = "rbxassetid://7733779610"})
+Tab7:AddButton({Name = "活了7天", Callback = function()
     loadstring(game:HttpGet("https://rawscripts.net/raw/Universal-Script-7-days-to-live-36824"))()
 end})
 
-local Tab7 = Window:MakeTab({Name = "死铁轨", Icon = "rbxassetid://7733779610"})
-Tab7:AddButton({Name = "死铁轨", Callback = function()
+--死铁轨
+local Tab8 = Window:MakeTab({Name = "死铁轨", Icon = "rbxassetid://7733779610"})
+Tab8:AddButton({Name = "死铁轨", Callback = function()
     loadstring(game:HttpGet("https://raw.githubusercontent.com/iopjklbnmsss/SansHubScript/refs/heads/main/SansHub"))()
 end})
 
