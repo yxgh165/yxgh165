@@ -48,6 +48,16 @@ Tab1:AddButton({Name = "打印 QQ号", Callback = function() print("913348285") 
 -- 确保你前面有这行（放在 OrionLib 初始化后）
 local Tab4 = Window:MakeTab({Name = "人物功能", Icon = "rbxassetid://7733779610"})
 
+-- 兼容 executor 没有 mouse1press / mouse1release
+local mouse1press  = mouse1press  or function()
+    local vim = game:GetService("VirtualInputManager")
+    vim:SendMouseButtonEvent(0,0,0,true,game,1)
+end
+local mouse1release = mouse1release or function()
+    local vim = game:GetService("VirtualInputManager")
+    vim:SendMouseButtonEvent(0,0,0,false,game,1)
+end
+
 -----------------------------------------------------------------
 -- ⑤ 双独立 FOV（白跟随 + 橙固定）都参与瞄准判定
 -----------------------------------------------------------------
@@ -99,7 +109,8 @@ local function getAimPos(character)
     local root = character:FindFirstChild("HumanoidRootPart")
     local bone = character:FindFirstChild(aimbotBone) or character:FindFirstChild("Head")
     if not (root and bone) then return nil end
-    return bone.Position + root.Velocity * aimbotPrediction
+    local vel = root.Velocity.Magnitude < 1 and Vector3.new(0,0,0) or root.Velocity
+    return bone.Position + vel * aimbotPrediction
 end
 
 local function isVisible(pos, ignore)
@@ -150,7 +161,7 @@ local function getClosest()
     return closest
 end
 
--- 主循环
+-- 主循环（带防瞬甩）
 local function startAimbot()
     if aimbotConn then return end
     aimbotConn = game:GetService("RunService").RenderStepped:Connect(function()
@@ -163,8 +174,15 @@ local function startAimbot()
         local aimPos = getAimPos(target.Character)
         if not aimPos then return end
 
-        local targetCFrame = CFrame.new(Camera.CFrame.Position, Camera.CFrame.Position + (aimPos - Camera.CFrame.Position).Unit)
-        Camera.CFrame = Camera.CFrame:Lerp(targetCFrame, 1 - aimbotSmooth)
+        -- 安全 + 角度限制
+        local delta = aimPos - Camera.CFrame.Position
+        if delta.Magnitude < 0.1 then return end
+        local targetCF = CFrame.new(Camera.CFrame.Position, Camera.CFrame.Position + delta.Unit)
+        local maxAngle = math.rad(90)
+        local angle = math.acos(math.clamp(Camera.CFrame.LookVector:Dot(targetCF.LookVector), -1, 1))
+        if angle <= maxAngle then
+            Camera.CFrame = Camera.CFrame:Lerp(targetCF, 1 - math.clamp(aimbotSmooth, 0.01, 0.99))
+        end
 
         if tick() - lastFire > aimbotDelay then
             mouse1press(); task.wait(); mouse1release()
@@ -180,7 +198,7 @@ local function stopAimbot()
 end
 
 -----------------------------------------------------------------
--- UI 构建
+-- UI 构建（原样保留）
 -----------------------------------------------------------------
 local aimbotSec = Tab4:AddSection({Name = "AI-Aimbot"})
 aimbotSec:AddToggle({
@@ -197,112 +215,25 @@ aimbotSec:AddToggle({
     Callback = function(v) aimbotCheckTeam = v end
 })
 
--- 跟随鼠标 FOV
 local mouseSec = Tab4:AddSection({Name = "跟随鼠标 FOV"})
-local mouseTog = mouseSec:AddToggle({
-    Name = "显示跟随FOV",
-    Default = false,
-    Callback = function(v) mouseFovCircle.Visible = v end
-})
-local mouseSlider = mouseSec:AddSlider({
-    Name = "半径（滑条）",
-    Min = 0, Max = 500, Default = mouseFOV, Increment = 5,
-    Callback = function(v)
-        mouseFOV = v
-        mouseFovCircle.Radius = v
-    end
-})
-mouseSec:AddTextbox({
-    Name = "半径（输入）",
-    Default = tostring(mouseFOV),
-    Callback = function(txt)
-        local n = tonumber(txt)
-        if n then
-            mouseFOV = n
-            mouseFovCircle.Radius = n
-            mouseSlider:Set(n)
-        end
-    end
-})
+local mouseTog = mouseSec:AddToggle({ Name = "显示跟随FOV", Default = false, Callback = function(v) mouseFovCircle.Visible = v end })
+local mouseSlider = mouseSec:AddSlider({ Name = "半径（滑条）", Min = 0, Max = 500, Default = mouseFOV, Increment = 5, Callback = function(v) mouseFOV = v; mouseFovCircle.Radius = v end })
+mouseSec:AddTextbox({ Name = "半径（输入）", Default = tostring(mouseFOV), Callback = function(txt) local n = tonumber(txt) if n then mouseFOV = n; mouseFovCircle.Radius = n; mouseSlider:Set(n) end end })
 
--- 固定中心 FOV
 local fixedSec = Tab4:AddSection({Name = "固定中心 FOV"})
-local fixedTog = fixedSec:AddToggle({
-    Name = "显示固定FOV",
-    Default = false,
-    Callback = function(v) fixedFovCircle.Visible = v end
-})
-local fixedSlider = fixedSec:AddSlider({
-    Name = "半径（滑条）",
-    Min = 0, Max = 500, Default = fixedFOV, Increment = 5,
-    Callback = function(v)
-        fixedFOV = v
-        fixedFovCircle.Radius = v
-    end
-})
-fixedSec:AddTextbox({
-    Name = "半径（输入）",
-    Default = tostring(fixedFOV),
-    Callback = function(txt)
-        local n = tonumber(txt)
-        if n then
-            fixedFOV = n
-            fixedFovCircle.Radius = n
-            fixedSlider:Set(n)
-        end
-    end
-})
+local fixedTog = fixedSec:AddToggle({ Name = "显示固定FOV", Default = false, Callback = function(v) fixedFovCircle.Visible = v end })
+local fixedSlider = fixedSec:AddSlider({ Name = "半径（滑条）", Min = 0, Max = 500, Default = fixedFOV, Increment = 5, Callback = function(v) fixedFOV = v; fixedFovCircle.Radius = v end })
+fixedSec:AddTextbox({ Name = "半径（输入）", Default = tostring(fixedFOV), Callback = function(txt) local n = tonumber(txt) if n then fixedFOV = n; fixedFovCircle.Radius = n; fixedSlider:Set(n) end end })
 
--- 其余通用参数（平滑、预测、延迟、骨骼）
 local commonSec = Tab4:AddSection({Name = "通用参数"})
-local smoothSlider = commonSec:AddSlider({
-    Name = "平滑系数（滑条）",
-    Min = 0, Max = 1, Default = aimbotSmooth, Increment = 0.01,
-    Callback = function(v) aimbotSmooth = v end
-})
-commonSec:AddTextbox({
-    Name = "平滑系数（输入）",
-    Default = tostring(aimbotSmooth),
-    Callback = function(txt)
-        local n = tonumber(txt)
-        if n then aimbotSmooth = n; smoothSlider:Set(n) end
-    end
-})
+local smoothSlider = commonSec:AddSlider({ Name = "平滑系数（滑条）", Min = 0, Max = 1, Default = aimbotSmooth, Increment = 0.01, Callback = function(v) aimbotSmooth = v end })
+commonSec:AddTextbox({ Name = "平滑系数（输入）", Default = tostring(aimbotSmooth), Callback = function(txt) local n = tonumber(txt) if n then aimbotSmooth = n; smoothSlider:Set(n) end end })
+local predSlider = commonSec:AddSlider({ Name = "预测 (秒)（滑条）", Min = 0, Max = 1, Default = aimbotPrediction, Increment = 0.01, Callback = function(v) aimbotPrediction = v end })
+commonSec:AddTextbox({ Name = "预测 (秒)（输入）", Default = tostring(aimbotPrediction), Callback = function(txt) local n = tonumber(txt) if n then aimbotPrediction = n; predSlider:Set(n) end end })
+local delaySlider = commonSec:AddSlider({ Name = "开火延迟 (秒)（滑条）", Min = 0, Max = 1, Default = aimbotDelay, Increment = 0.01, Callback = function(v) aimbotDelay = v end })
+commonSec:AddTextbox({ Name = "开火延迟 (秒)（输入）", Default = tostring(aimbotDelay), Callback = function(txt) local n = tonumber(txt) if n then aimbotDelay = n; delaySlider:Set(n) end end })
+commonSec:AddDropdown({ Name = "瞄准骨骼", Default = aimbotBone, Options = {"Head","Neck","UpperTorso","HumanoidRootPart"}, Callback = function(v) aimbotBone = v end })
 
-local predSlider = commonSec:AddSlider({
-    Name = "预测 (秒)（滑条）",
-    Min = 0, Max = 1, Default = aimbotPrediction, Increment = 0.01,
-    Callback = function(v) aimbotPrediction = v end
-})
-commonSec:AddTextbox({
-    Name = "预测 (秒)（输入）",
-    Default = tostring(aimbotPrediction),
-    Callback = function(txt)
-        local n = tonumber(txt)
-        if n then aimbotPrediction = n; predSlider:Set(n) end
-    end
-})
-
-local delaySlider = commonSec:AddSlider({
-    Name = "开火延迟 (秒)（滑条）",
-    Min = 0, Max = 1, Default = aimbotDelay, Increment = 0.01,
-    Callback = function(v) aimbotDelay = v end
-})
-commonSec:AddTextbox({
-    Name = "开火延迟 (秒)（输入）",
-    Default = tostring(aimbotDelay),
-    Callback = function(txt)
-        local n = tonumber(txt)
-        if n then aimbotDelay = n; delaySlider:Set(n) end
-    end
-})
-
-commonSec:AddDropdown({
-    Name = "瞄准骨骼",
-    Default = aimbotBone,
-    Options = {"Head","Neck","UpperTorso","HumanoidRootPart"},
-    Callback = function(v) aimbotBone = v end
-})
 
 -----------------------------------------------------------------
 -- ⑥ 删除阴影（全局开关）
@@ -401,7 +332,7 @@ Tab4:AddToggle({Name = "极简玩家 ESP", Default = false, Callback = function(
     espEnabled = v
     while espEnabled do
         drawESP()
-        task.wait(0.03)
+        task.wait(0.000000000000000000000000000000000000001)
     end
     clearESP()
 end})
@@ -452,7 +383,7 @@ Tab4:AddToggle({Name = "NPC 透视", Default = false, Callback = function(v)
     npcEspEnabled = v
     while npcEspEnabled do
         drawNPCEsp()
-        task.wait(0.03)
+        task.wait(0.0000000000000000000000000000000000001)
     end
     clearNPCEsp()
 end})
