@@ -25,7 +25,7 @@
         ConfigFolder = "StitchConfig"
     })
     
-    -- 公告 Tab
+    -- 公告 Tab (Tab1)
     local Tab1 = Window:MakeTab({Name = "公告", Icon = "rbxassetid://7733779610"})
     local function getDate() return os.date("%Y-%m-%d %H:%M") end
     local function getPlayer()
@@ -45,7 +45,7 @@
     end
     Tab1:AddButton({Name = "打印 QQ号", Callback = function() print("913348285") end})
     
-    -- 确保你前面有这行（放在 OrionLib 初始化后）
+    -- 人物功能 Tab (Tab2)
     local Tab2 = Window:MakeTab({Name = "人物功能", Icon = "rbxassetid://7733779610"})
     
     -- 兼容 executor 没有 mouse1press / mouse1release
@@ -233,7 +233,7 @@
     end
     
     -----------------------------------------------------------------
-    -- UI 构建（原样保留）
+    -- UI 构建（使用 Tab2）
     -----------------------------------------------------------------
     local aimbotSec = Tab2:AddSection({Name = "AI-Aimbot"})
     aimbotSec:AddToggle({
@@ -958,43 +958,43 @@
         end
     })
     
-    --控制台 Tap
+    -- 控制台标签页 (Tab3)
     local Tab3 = Window:MakeTab({Name = "控制台", Icon = "rbxassetid://7733779610"})
     Tab3:AddButton({Name = "控制台", Callback = function()
         loadstring(game:HttpGet("https://pastebin.com/raw/HfCtLtt9"))()
     end})
     
-    -- XA脚本 Tab
+    -- XA脚本标签页 (Tab4)
     local Tab4 = Window:MakeTab({Name = "XA脚本", Icon = "rbxassetid://7733779610"})
     Tab4:AddButton({Name = "XA HUB", Callback = function()
         loadstring(game:HttpGet("https://xingtaiduan.pythonanywhere.com/Loader"))()
     end})
     
-    --RB脚本中心 Tap
+    -- RB脚本标签页 (Tab5)
     local Tab5 = Window:MakeTab({Name = "RB脚本", Icon = "rbxassetid://7733779610"})
     Tab5:AddButton({Name = "Rb脚本", Callback = function()
         loadstring(game:HttpGet("https://raw.githubusercontent.com/Yungengxin/roblox/refs/heads/main/Rb-Hub"))()
     end})
     
-    -- 生存与杀手 Tab
+    -- 生存与杀手标签页 (Tab6)
     local Tab6 = Window:MakeTab({Name = "生存与杀手", Icon = "rbxassetid://7733779610"})
     Tab6:AddButton({Name = "生存与杀手", Callback = function()
         loadstring(game:HttpGet("https://raw.githubusercontent.com/Milan08Studio/ChairWare/main/main.lua"))()
     end})
     
-    --爱德华
+    -- 爱德华标签页 (Tab7)
     local Tab7 = Window:MakeTab({Name = "爱德华", Icon = "rbxassetid://7733779610"})
     Tab7:AddButton({Name = "爱德华", Callback = function()
         loadstring(game:HttpGet("https://raw.githubusercontent.com/gumanba/Scripts/main/Edward"))()
     end})
     
-    --活了7天
+    -- 活了7天标签页 (Tab8)
     local Tab8 = Window:MakeTab({Name = "活了7天", Icon = "rbxassetid://7733779610"})
     Tab8:AddButton({Name = "活了7天", Callback = function()
         loadstring(game:HttpGet("https://rawscripts.net/raw/Universal-Script-7-days-to-live-36824"))()
     end})
     
-    --死铁轨
+    -- 死铁轨标签页 (Tab9)
     local Tab9 = Window:MakeTab({Name = "死铁轨", Icon = "rbxassetid://7733979610"})
     Tab9:AddButton({Name = "死铁轨", Callback = function()
         loadstring(game:HttpGet("https://raw.githubusercontent.com/iopjklbnmsss/SansHubScript/refs/heads/main/SansHub"))()
