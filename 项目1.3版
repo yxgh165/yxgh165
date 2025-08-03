@@ -46,7 +46,7 @@
     Tab1:AddButton({Name = "打印 QQ号", Callback = function() print("913348285") end})
     
     -- 确保你前面有这行（放在 OrionLib 初始化后）
-    local Tab4 = Window:MakeTab({Name = "人物功能", Icon = "rbxassetid://7733779610"})
+    local Tab2 = Window:MakeTab({Name = "人物功能", Icon = "rbxassetid://7733779610"})
     
     -- 兼容 executor 没有 mouse1press / mouse1release
     local mouse1press  = mouse1press  or function()
@@ -235,7 +235,7 @@
     -----------------------------------------------------------------
     -- UI 构建（原样保留）
     -----------------------------------------------------------------
-    local aimbotSec = Tab4:AddSection({Name = "AI-Aimbot"})
+    local aimbotSec = Tap2:AddSection({Name = "AI-Aimbot"})
     aimbotSec:AddToggle({
         Name = "启用 Aimbot",
         Default = false,
@@ -254,17 +254,17 @@
         Callback = function(v) aimbotCheckTeam = v end
     })
     
-    local mouseSec = Tab4:AddSection({Name = "跟随鼠标 FOV"})
+    local mouseSec = Tap2:AddSection({Name = "跟随鼠标 FOV"})
     local mouseTog = mouseSec:AddToggle({ Name = "显示跟随FOV", Default = false, Callback = function(v) mouseFovCircle.Visible = v end })
     local mouseSlider = mouseSec:AddSlider({ Name = "半径（滑条）", Min = 0, Max = 500, Default = mouseFOV, Increment = 5, Callback = function(v) mouseFOV = v; mouseFovCircle.Radius = v end })
     mouseSec:AddTextbox({ Name = "半径（输入）", Default = tostring(mouseFOV), Callback = function(txt) local n = tonumber(txt) if n then mouseFOV = n; mouseFovCircle.Radius = n; mouseSlider:Set(n) end end })
     
-    local fixedSec = Tab4:AddSection({Name = "固定中心 FOV"})
+    local fixedSec = Tap2:AddSection({Name = "固定中心 FOV"})
     local fixedTog = fixedSec:AddToggle({ Name = "显示固定FOV", Default = false, Callback = function(v) fixedFovCircle.Visible = v end })
     local fixedSlider = fixedSec:AddSlider({ Name = "半径（滑条）", Min = 0, Max = 500, Default = fixedFOV, Increment = 5, Callback = function(v) fixedFOV = v; fixedFovCircle.Radius = v end })
     fixedSec:AddTextbox({ Name = "半径（输入）", Default = tostring(fixedFOV), Callback = function(txt) local n = tonumber(txt) if n then fixedFOV = n; fixedFovCircle.Radius = n; fixedSlider:Set(n) end end })
     
-    local commonSec = Tab4:AddSection({Name = "通用参数"})
+    local commonSec = Tap2:AddSection({Name = "通用参数"})
     local smoothSlider = commonSec:AddSlider({ Name = "平滑系数（滑条）", Min = 0, Max = 1, Default = aimbotSmooth, Increment = 0.01, Callback = function(v) aimbotSmooth = v end })
     commonSec:AddTextbox({ Name = "平滑系数（输入）", Default = tostring(aimbotSmooth), Callback = function(txt) local n = tonumber(txt) if n then aimbotSmooth = n; smoothSlider:Set(n) end end })
     local predSlider = commonSec:AddSlider({ Name = "预测 (秒)（滑条）", Min = 0, Max = 1, Default = aimbotPrediction, Increment = 0.01, Callback = function(v) aimbotPrediction = v end })
@@ -277,7 +277,7 @@
     -----------------------------------------------------------------
     -- ⑥ 删除阴影（全局开关）
     -----------------------------------------------------------------
-    Tab4:AddToggle({
+    Tap2:AddToggle({
         Name = "删除阴影",
         Default = false,
         Callback = function(v)
@@ -369,7 +369,7 @@
         end
     end
     
-    Tab4:AddToggle({
+    Tap2:AddToggle({
         Name = "飞行", 
         Default = false, 
         Callback = function(v)
@@ -382,7 +382,7 @@
         end
     })
     
-    Tab4:AddSlider({
+    Tap2:AddSlider({
         Name = "飞行速度",
         Min = 10,
         Max = 200,
@@ -550,7 +550,7 @@
     
     -- 启动ESP循环
     local espLoop
-    Tab4:AddToggle({
+    Tap2:AddToggle({
         Name = "增强玩家 ESP", 
         Default = false, 
         Callback = function(v)
@@ -685,7 +685,7 @@
     
     -- 启动NPC ESP循环
     local npcEspLoop
-    Tab4:AddToggle({
+    Tap2:AddToggle({
         Name = "增强NPC透视", 
         Default = false, 
         Callback = function(v)
@@ -795,7 +795,7 @@
     end)
     
     -- 输入框 + 开关
-    local lockSec = Tab4:AddSection({Name = "三锁定"})
+    local lockSec = Tap2:AddSection({Name = "三锁定"})
     
     -- 速度模式选择
     lockSec:AddDropdown({
@@ -965,8 +965,8 @@
     end})
     
     -- XA脚本 Tab
-    local Tab4 = Window:MakeTab({Name = "XA脚本", Icon = "rbxassetid://7733779610"})
-    Tab4:AddButton({Name = "XA HUB", Callback = function()
+    local Tap4 = Window:MakeTab({Name = "XA脚本", Icon = "rbxassetid://7733779610"})
+    Tap4:AddButton({Name = "XA HUB", Callback = function()
         loadstring(game:HttpGet("https://xingtaiduan.pythonanywhere.com/Loader"))()
     end})
     
