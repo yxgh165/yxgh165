@@ -1,30 +1,10 @@
 (function()
-    -- 安全加载OrionLib
-    local OrionLib, loadSuccess = pcall(function()
-        return loadstring(game:HttpGet("https://raw.githubusercontent.com/wsomoQaz/lua-/main/Xcccc"))()
-    end)
-    
-    if not loadSuccess or not OrionLib then
-        -- 备用加载方案
-        OrionLib = loadstring(game:HttpGet("https://raw.githubusercontent.com/shlexware/Orion/main/source"))()
-    end
-
-    -- 确保OrionLib加载成功
-    if not OrionLib then
-        warn("无法加载OrionLib UI库！")
-        return
-    end
-
-    -- 定义全局服务
-    local Players = game:GetService("Players")
-    local LocalPlayer = Players.LocalPlayer
-    local Camera = workspace.CurrentCamera
-    local UserInputService = game:GetService("UserInputService")
-    local RunService = game:GetService("RunService")
-
     -- 强制 200×200 居中窗口
     getgenv().WindowSize = UDim2.new(0, 200, 0, 200)
-
+    
+    -- 黑色 OrionLib UI
+    local OrionLib = loadstring(game:HttpGet("https://raw.githubusercontent.com/wsomoQaz/lua-/main/Xcccc"))()
+    
     -- 纯黑主题
     OrionLib.Themes.Default = {
         Main    = Color3.fromRGB(20,20,20),
@@ -35,27 +15,21 @@
         TextDark= Color3.fromRGB(200,200,200)
     }
     OrionLib.SelectedTheme = "Default"
-
-    -- 安全获取执行器名称
-    local executorName = "未知执行器"
-    if type(identifyexecutor) == "function" then
-        executorName = identifyexecutor() or executorName
-    end
-
+    
     -- 主窗口
     local Window = OrionLib:MakeWindow({
         IntroText = "坤坤大帝脚本",
-        Name = "坤坤大帝脚本 - " .. executorName,
+        Name = "坤坤大帝脚本 - " .. identifyexecutor(),
         HidePremium = false,
         SaveConfig = true,
         ConfigFolder = "StitchConfig"
     })
-
+    
     -- 公告 Tab
     local Tab1 = Window:MakeTab({Name = "公告", Icon = "rbxassetid://7733779610"})
     local function getDate() return os.date("%Y-%m-%d %H:%M") end
     local function getPlayer()
-        local p = LocalPlayer
+        local p = game.Players.LocalPlayer
         return {
             ["用户名"]   = p.Name,
             ["显示名"]   = p.DisplayName,
@@ -64,17 +38,16 @@
             ["当前游戏"] = game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId).Name
         }
     end
-    
     Tab1:AddLabel("📅 当前时间")
     Tab1:AddLabel(getDate())
     for k, v in pairs(getPlayer()) do
         Tab1:AddLabel(k .. "： " .. tostring(v))
     end
     Tab1:AddButton({Name = "打印 QQ号", Callback = function() print("913348285") end})
-
+    
     -- 确保你前面有这行（放在 OrionLib 初始化后）
     local Tab4 = Window:MakeTab({Name = "人物功能", Icon = "rbxassetid://7733779610"})
-
+    
     -- 兼容 executor 没有 mouse1press / mouse1release
     local mouse1press  = mouse1press  or function()
         local vim = game:GetService("VirtualInputManager")
@@ -84,7 +57,7 @@
         local vim = game:GetService("VirtualInputManager")
         vim:SendMouseButtonEvent(0,0,0,false,game,1)
     end
-
+    
     -----------------------------------------------------------------
     -- ⑤ 双独立 FOV（白跟随 + 橙固定）都参与瞄准判定
     -----------------------------------------------------------------
@@ -97,7 +70,13 @@
     local aimbotCheckTeam    = true
     local lastFire = 0
     local aimbotConn
-
+    
+    -- 缺失变量一次性补全
+    local Camera = workspace.CurrentCamera
+    local UserInputService = game:GetService("UserInputService")
+    local Players = game:GetService("Players")
+    local LocalPlayer = Players.LocalPlayer
+    
     -- 1. 跟随鼠标 FOV
     local mouseFOV      = 120
     local mouseFovCircle = Drawing.new("Circle")
@@ -107,7 +86,8 @@
     mouseFovCircle.Color     = Color3.fromRGB(255,255,255)
     mouseFovCircle.Filled    = false
     mouseFovCircle.Visible   = false
-
+    mouseFovCircle.ZIndex = 10
+    
     -- 2. 固定中心 FOV
     local fixedFOV      = 90
     local fixedFovCircle = Drawing.new("Circle")
@@ -117,7 +97,8 @@
     fixedFovCircle.Color     = Color3.fromRGB(255,165,0)
     fixedFovCircle.Filled    = false
     fixedFovCircle.Visible   = false
-
+    fixedFovCircle.ZIndex = 9
+    
     -- 固定圆中心一次设置
     local function setFixedCenter()
         local center = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
@@ -125,7 +106,7 @@
     end
     Camera:GetPropertyChangedSignal("ViewportSize"):Connect(setFixedCenter)
     setFixedCenter()
-
+    
     -- 工具函数
     local function getAimPos(character)
         if not character then return nil end
@@ -135,7 +116,7 @@
         local vel = root.Velocity.Magnitude < 1 and Vector3.new(0,0,0) or root.Velocity
         return bone.Position + vel * aimbotPrediction
     end
-
+    
     local function isVisible(pos, ignore)
         local origin = Camera.CFrame.Position
         local direction = (pos - origin).Unit
@@ -143,7 +124,7 @@
         local part, position = workspace:FindPartOnRayWithIgnoreList(ray, ignore or {LocalPlayer.Character})
         return part == nil or part:IsDescendantOf(LocalPlayer.Character)
     end
-
+    
     -- 判定是否在任一 FOV
     local function inAnyFOV(worldPos)
         local screenPos = Camera:WorldToViewportPoint(worldPos)
@@ -168,7 +149,7 @@
         
         return false
     end
-
+    
     -- 取最近目标（以固定中心为基准）
     local function getClosest()
         local closest, minDist = nil, math.huge
@@ -198,12 +179,12 @@
         end
         return closest
     end
-
+    
     -- 主循环（带防瞬甩）
     local function startAimbot()
         if aimbotConn then return end
         
-        aimbotConn = RunService.RenderStepped:Connect(function()
+        aimbotConn = game:GetService("RunService").RenderStepped:Connect(function()
             if not aimbotEnabled then return end
             
             -- 更新跟随圆
@@ -250,9 +231,9 @@
         mouseFovCircle.Visible = false
         fixedFovCircle.Visible = false
     end
-
+    
     -----------------------------------------------------------------
-    -- UI 构建
+    -- UI 构建（原样保留）
     -----------------------------------------------------------------
     local aimbotSec = Tab4:AddSection({Name = "AI-Aimbot"})
     aimbotSec:AddToggle({
@@ -291,6 +272,7 @@
     local delaySlider = commonSec:AddSlider({ Name = "开火延迟 (秒)（滑条）", Min = 0, Max = 1, Default = aimbotDelay, Increment = 0.01, Callback = function(v) aimbotDelay = v end })
     commonSec:AddTextbox({ Name = "开火延迟 (秒)（输入）", Default = tostring(aimbotDelay), Callback = function(txt) local n = tonumber(txt) if n then aimbotDelay = n; delaySlider:Set(n) end end })
     commonSec:AddDropdown({ Name = "瞄准骨骼", Default = aimbotBone, Options = {"Head","Neck","UpperTorso","HumanoidRootPart"}, Callback = function(v) aimbotBone = v end })
+    
     
     -----------------------------------------------------------------
     -- ⑥ 删除阴影（全局开关）
@@ -341,7 +323,7 @@
         flyBodyGyro.CFrame = flyRoot.CFrame
         flyBodyGyro.Parent = flyRoot
         
-        flyConn = RunService.Heartbeat:Connect(function(dt)
+        flyConn = game:GetService("RunService").Heartbeat:Connect(function(dt)
             if not flyRoot then return end
             
             flyBodyGyro.CFrame = Camera.CFrame
@@ -575,7 +557,7 @@
             espEnabled = v
             if v then
                 if not espLoop then
-                    espLoop = RunService.RenderStepped:Connect(updateESP)
+                    espLoop = game:GetService("RunService").RenderStepped:Connect(updateESP)
                 end
             else
                 if espLoop then
@@ -710,7 +692,7 @@
             npcEspEnabled = v
             if v then
                 if not npcEspLoop then
-                    npcEspLoop = RunService.RenderStepped:Connect(updateNpcESP)
+                    npcEspLoop = game:GetService("RunService").RenderStepped:Connect(updateNpcESP)
                 end
             else
                 if npcEspLoop then
@@ -729,11 +711,38 @@
     })
     
     -----------------------------------------------------------------
-    -- ⑩ 三锁定：移速 / 跳跃 / 重力
+    -- ⑩ 三锁定：移速 / 跳跃 / 重力（升级版 - 多种模式）
     -----------------------------------------------------------------
     local lockSpeed, lockJump, lockGrav = false, false, false
     local savedSpeed, savedJump, savedGrav = 16, 50, 196
     
+    -- 新增：移速模式系统
+    local speedModes = {
+        ["普通模式"] = 1.0,
+        ["快速模式"] = 1.5,
+        ["疾跑模式"] = 2.0,
+        ["超速模式"] = 3.0
+    }
+    
+    local currentSpeedMode = "普通模式"
+    local speedModeMultiplier = 1.0
+    
+    -- 新增：跳跃模式系统
+    local jumpModes = {
+        ["普通跳跃"] = 1.0,
+        ["高跳模式"] = 1.8,
+        ["超高跳跃"] = 2.5,
+        ["无限跳跃"] = 1.0  -- 特殊模式
+    }
+    
+    local currentJumpMode = "普通跳跃"
+    local jumpModeMultiplier = 1.0
+    local infiniteJumpEnabled = false
+    
+    -- 无限跳跃连接
+    local infiniteJumpConnection = nil
+    
+    -- 应用速度值
     local function applyValues()
         local char = LocalPlayer.Character
         if not char then return end
@@ -741,36 +750,117 @@
         local hum = char:FindFirstChildOfClass("Humanoid")
         if not hum then return end
         
-        if lockSpeed then hum.WalkSpeed = savedSpeed end
-        if lockJump then hum.JumpPower = savedJump end
-        if lockGrav then workspace.Gravity = savedGrav end
+        if lockSpeed then 
+            -- 应用速度模式
+            hum.WalkSpeed = savedSpeed * speedModeMultiplier
+        end
+        
+        if lockJump then 
+            -- 应用跳跃模式
+            if currentJumpMode == "无限跳跃" then
+                hum.JumpPower = savedJump
+            else
+                hum.JumpPower = savedJump * jumpModeMultiplier
+            end
+        end
+        
+        if lockGrav then 
+            workspace.Gravity = savedGrav 
+        end
     end
     
-    LocalPlayer.CharacterAdded:Connect(function()
+    -- 无限跳跃功能
+    local function setupInfiniteJump()
+        if infiniteJumpConnection then
+            infiniteJumpConnection:Disconnect()
+            infiniteJumpConnection = nil
+        end
+        
+        if infiniteJumpEnabled then
+            infiniteJumpConnection = game:GetService("UserInputService").JumpRequest:Connect(function()
+                if infiniteJumpEnabled then
+                    local hum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+                    if hum then
+                        hum:ChangeState(Enum.HumanoidStateType.Jumping)
+                    end
+                end
+            end)
+        end
+    end
+    
+    LocalPlayer.CharacterAdded:Connect(function(char)
         task.wait(0.5)
         applyValues()
+        setupInfiniteJump()
     end)
     
     -- 输入框 + 开关
     local lockSec = Tab4:AddSection({Name = "三锁定"})
+    
+    -- 速度模式选择
+    lockSec:AddDropdown({
+        Name = "速度模式",
+        Default = currentSpeedMode,
+        Options = {"普通模式", "快速模式", "疾跑模式", "超速模式"},
+        Callback = function(v)
+            currentSpeedMode = v
+            speedModeMultiplier = speedModes[v] or 1.0
+            applyValues()
+            OrionLib:MakeNotification({
+                Name = "速度模式",
+                Content = "已切换到: " .. v,
+                Time = 2
+            })
+        end
+    })
+    
+    -- 跳跃模式选择
+    lockSec:AddDropdown({
+        Name = "跳跃模式",
+        Default = currentJumpMode,
+        Options = {"普通跳跃", "高跳模式", "超高跳跃", "无限跳跃"},
+        Callback = function(v)
+            currentJumpMode = v
+            jumpModeMultiplier = jumpModes[v] or 1.0
+            
+            -- 处理无限跳跃模式
+            if v == "无限跳跃" then
+                infiniteJumpEnabled = true
+            else
+                infiniteJumpEnabled = false
+            end
+            
+            setupInfiniteJump()
+            applyValues()
+            
+            OrionLib:MakeNotification({
+                Name = "跳跃模式",
+                Content = "已切换到: " .. v,
+                Time = 2
+            })
+        end
+    })
+    
     lockSec:AddTextbox({
-        Name = "设定移速（仅保存值）", 
+        Name = "设定基础移速", 
         Default = tostring(savedSpeed), 
         Callback = function(txt) 
             savedSpeed = tonumber(txt) or 16 
             applyValues()
         end
     })
+    
     lockSec:AddTextbox({
-        Name = "设定跳跃高度（仅保存值）", 
+        Name = "设定基础跳跃高度", 
         Default = tostring(savedJump), 
         Callback = function(txt) 
             savedJump = tonumber(txt) or 50 
             applyValues()
         end
     })
+    
     lockSec:AddTextbox({
-        Name = "设定重力值（仅保存值）", 
+        Name = "设定重力值", 
         Default = tostring(savedGrav), 
         Callback = function(txt) 
             savedGrav = tonumber(txt) or 196 
@@ -786,6 +876,7 @@
             applyValues()
         end
     })
+    
     lockSec:AddToggle({
         Name = "锁定跳跃", 
         Default = false, 
@@ -794,6 +885,7 @@
             applyValues()
         end
     })
+    
     lockSec:AddToggle({
         Name = "锁定重力", 
         Default = false, 
@@ -803,310 +895,111 @@
         end
     })
     
-    -----------------------------------------------------------------
-    -- ⑪ 高级移动加速系统（支持躲避服务器游戏）
-    -----------------------------------------------------------------
-    local speedEnabled = false
-    local speedMultiplier = 1.5
-    local speedMode = "地面加速" -- 可选: "地面加速", "全局加速", "瞬移冲刺", "自动跳跃"
-    local antiSlide = true -- 防止墙壁滑动
-    local speedParticles = true -- 速度粒子效果
-    local speedTrail = true -- 移动轨迹效果
-    local speedKey = Enum.KeyCode.LeftShift -- 加速快捷键
-    local speedConn
-    local lastPosition = Vector3.new(0, 0, 0)
+    -- 添加视觉指示器
+    local speedIndicator = lockSec:AddLabel("当前速度: " .. savedSpeed * speedModeMultiplier)
+    local jumpIndicator = lockSec:AddLabel("当前跳跃: " .. savedJump * jumpModeMultiplier)
     
-    -- 粒子效果缓存
-    local particleCache = {}
-    local trailCache = {}
-    
-    -- 速度效果创建函数
-    local function createSpeedEffects()
-        if not speedParticles and not speedTrail then return end
+    -- 更新指示器
+    local function updateIndicators()
+        speedIndicator:Set("当前速度: " .. string.format("%.1f", savedSpeed * speedModeMultiplier))
         
-        local char = LocalPlayer.Character
-        if not char then return end
-        
-        local root = char:FindFirstChild("HumanoidRootPart")
-        if not root then return end
-        
-        -- 创建粒子效果
-        if speedParticles and not particleCache[root] then
-            local particles = Instance.new("ParticleEmitter")
-            particles.Name = "SpeedParticles"
-            particles.LightEmission = 0.8
-            particles.LightInfluence = 0
-            particles.Size = NumberSequence.new({
-                NumberSequenceKeypoint.new(0, 0.5),
-                NumberSequenceKeypoint.new(1, 0)
-            })
-            particles.Texture = "rbxassetid://242487987"
-            particles.Transparency = NumberSequence.new(0.5)
-            particles.ZOffset = 1
-            particles.Acceleration = Vector3.new(0, -5, 0)
-            particles.Lifetime = NumberRange.new(0.5, 1)
-            particles.Rate = 50
-            particles.Rotation = NumberRange.new(0, 360)
-            particles.Speed = NumberRange.new(2)
-            particles.VelocitySpread = 180
-            particles.Parent = root
-            
-            particleCache[root] = particles
-        end
-        
-        -- 创建移动轨迹
-        if speedTrail and not trailCache[root] then
-            local trail = Instance.new("Trail")
-            trail.Name = "SpeedTrail"
-            trail.FaceCamera = true
-            trail.LightEmission = 0.7
-            trail.Color = ColorSequence.new(Color3.fromRGB(0, 200, 255))
-            trail.Transparency = NumberSequence.new(0.5)
-            trail.WidthScale = NumberSequence.new(0.3)
-            trail.Attachment0 = Instance.new("Attachment", root)
-            trail.Attachment0.Name = "SpeedTrailAttachment0"
-            trail.Attachment0.WorldPosition = root.Position
-            trail.Attachment1 = Instance.new("Attachment", root)
-            trail.Attachment1.Name = "SpeedTrailAttachment1"
-            trail.Attachment1.WorldPosition = root.Position + Vector3.new(0, 0.5, 0)
-            trail.Parent = root
-            
-            trailCache[root] = trail
+        if currentJumpMode == "无限跳跃" then
+            jumpIndicator:Set("当前跳跃: 无限跳跃")
+        else
+            jumpIndicator:Set("当前跳跃: " .. string.format("%.1f", savedJump * jumpModeMultiplier))
         end
     end
     
-    -- 清理效果
-    local function cleanSpeedEffects()
-        for _, particles in pairs(particleCache) do
-            pcall(function() particles:Destroy() end)
-        end
-        for _, trail in pairs(trailCache) do
-            pcall(function() trail:Destroy() end)
-        end
-        table.clear(particleCache)
-        table.clear(trailCache)
-    end
+    -- 定期更新指示器
+    game:GetService("RunService").Heartbeat:Connect(function()
+        updateIndicators()
+    end)
     
-    -- 速度计算函数（带防滑墙）
-    local function calculateSpeed(deltaTime)
-        local char = LocalPlayer.Character
-        if not char then return end
-        
-        local humanoid = char:FindFirstChildOfClass("Humanoid")
-        local root = char:FindFirstChild("HumanoidRootPart")
-        if not humanoid or not root then return end
-        
-        -- 检测是否在墙上（防滑墙）
-        local onWall = false
-        if antiSlide then
-            local ray = Ray.new(root.Position, root.CFrame.LookVector * 3)
-            local hit, position = workspace:FindPartOnRay(ray, char)
-            if hit then
-                onWall = true
-            end
-        end
-        
-        -- 计算方向向量
-        local moveDirection = Vector3.new(0, 0, 0)
-        if UserInputService:IsKeyDown(Enum.KeyCode.W) then
-            moveDirection = moveDirection + root.CFrame.LookVector
-        end
-        if UserInputService:IsKeyDown(Enum.KeyCode.S) then
-            moveDirection = moveDirection - root.CFrame.LookVector
-        end
-        if UserInputService:IsKeyDown(Enum.KeyCode.A) then
-            moveDirection = moveDirection - root.CFrame.RightVector
-        end
-        if UserInputService:IsKeyDown(Enum.KeyCode.D) then
-            moveDirection = moveDirection + root.CFrame.RightVector
-        end
-        
-        -- 标准化方向向量
-        if moveDirection.Magnitude > 0 then
-            moveDirection = moveDirection.Unit
-        end
-        
-        -- 应用不同加速模式
-        if speedMode == "地面加速" and humanoid:GetState() == Enum.HumanoidStateType.Running then
-            -- 地面移动加速
-            local velocity = moveDirection * (humanoid.WalkSpeed * speedMultiplier)
-            if not onWall then
-                root.Velocity = Vector3.new(velocity.X, root.Velocity.Y, velocity.Z)
-            end
-            
-        elseif speedMode == "全局加速" then
-            -- 任何状态都加速
-            local velocity = moveDirection * (humanoid.WalkSpeed * speedMultiplier)
-            if not onWall then
-                root.Velocity = Vector3.new(velocity.X, root.Velocity.Y, velocity.Z)
-            end
-            
-        elseif speedMode == "瞬移冲刺" then
-            -- 短距离瞬移
-            if (root.Position - lastPosition).Magnitude > 5 then
-                local distance = math.min(10, (root.Position - lastPosition).Magnitude * 0.5)
-                root.CFrame = root.CFrame + moveDirection * distance
-            end
-            
-        elseif speedMode == "自动跳跃" then
-            -- 自动跳跃障碍
-            if humanoid:GetState() == Enum.HumanoidStateType.Running then
-                -- 检测前方障碍
-                local ray = Ray.new(root.Position + Vector3.new(0, 1, 0), root.CFrame.LookVector * 5)
-                local hit, position = workspace:FindPartOnRay(ray, char)
-                
-                if hit and humanoid.FloorMaterial == Enum.Material.Air then
-                    humanoid.Jump = true
-                end
-                
-                -- 应用速度
-                local velocity = moveDirection * (humanoid.WalkSpeed * speedMultiplier)
-                if not onWall then
-                    root.Velocity = Vector3.new(velocity.X, root.Velocity.Y, velocity.Z)
-                end
-            end
-        end
-        
-        -- 更新位置
-        lastPosition = root.Position
-    end
+    -- 添加模式说明
+    lockSec:AddLabel("速度模式说明:")
+    lockSec:AddLabel("普通模式 = 1x | 快速模式 = 1.5x")
+    lockSec:AddLabel("疾跑模式 = 2x | 超速模式 = 3x")
     
-    -- 启动加速系统
-    local function startSpeedBoost()
-        if speedConn then return end
-        
-        speedConn = RunService.Heartbeat:Connect(function(deltaTime)
-            if not speedEnabled then return end
-            
-            -- 只在按下快捷键时加速
-            if UserInputService:IsKeyDown(speedKey) then
-                calculateSpeed(deltaTime)
-                createSpeedEffects()
-            else
-                cleanSpeedEffects()
-            end
-        end)
-    end
+    lockSec:AddLabel("跳跃模式说明:")
+    lockSec:AddLabel("普通跳跃 = 1x | 高跳模式 = 1.8x")
+    lockSec:AddLabel("超高跳跃 = 2.5x | 无限跳跃 = 空中无限跳")
     
-    -- 停止加速系统
-    local function stopSpeedBoost()
-        if speedConn then 
-            speedConn:Disconnect() 
-            speedConn = nil 
-        end
-        cleanSpeedEffects()
-    end
-    
-    -- UI 设置
-    local speedSec = Tab4:AddSection({Name = "移动加速系统"})
-    speedSec:AddToggle({
-        Name = "启用移动加速",
-        Default = false,
-        Callback = function(v)
-            speedEnabled = v
-            if v then 
-                startSpeedBoost()
-            else 
-                stopSpeedBoost()
-            end
-        end
-    })
-    
-    speedSec:AddDropdown({
-        Name = "加速模式",
-        Default = speedMode,
-        Options = {"地面加速", "全局加速", "瞬移冲刺", "自动跳跃"},
-        Callback = function(v)
-            speedMode = v
-        end
-    })
-    
-    speedSec:AddSlider({
-        Name = "加速倍数",
-        Min = 1,
-        Max = 5,
-        Default = speedMultiplier,
-        Increment = 0.1,
-        ValueName = "倍",
-        Callback = function(v)
-            speedMultiplier = v
-        end
-    })
-    
-    speedSec:AddToggle({
-        Name = "防滑墙功能",
-        Default = antiSlide,
-        Callback = function(v)
-            antiSlide = v
-        end
-    })
-    
-    speedSec:AddToggle({
-        Name = "速度粒子效果",
-        Default = speedParticles,
-        Callback = function(v)
-            speedParticles = v
-            if not v then
-                cleanSpeedEffects()
-            end
-        end
-    })
-    
-    speedSec:AddToggle({
-        Name = "移动轨迹效果",
-        Default = speedTrail,
-        Callback = function(v)
-            speedTrail = v
-            if not v then
-                cleanSpeedEffects()
-            end
-        end
-    })
-    
-    speedSec:AddKeypicker({
-        Name = "加速快捷键",
+    -- 添加一个模式切换快捷键示例
+    lockSec:AddKeypicker({
+        Name = "疾跑模式快捷键",
         Default = Enum.KeyCode.LeftShift,
         Callback = function(key)
-            speedKey = key
+            if key == Enum.KeyCode.LeftShift then
+                if lockSpeed then
+                    local prevMode = currentSpeedMode
+                    currentSpeedMode = "疾跑模式"
+                    speedModeMultiplier = speedModes["疾跑模式"]
+                    applyValues()
+                    
+                    -- 添加通知
+                    OrionLib:MakeNotification({
+                        Name = "疾跑模式",
+                        Content = "疾跑模式已激活!",
+                        Time = 2
+                    })
+                    
+                    -- 释放时恢复原模式
+                    local conn
+                    conn = UserInputService.InputEnded:Connect(function(input)
+                        if input.KeyCode == key then
+                            currentSpeedMode = prevMode
+                            speedModeMultiplier = speedModes[prevMode] or 1.0
+                            applyValues()
+                            conn:Disconnect()
+                        end
+                    end)
+                end
+            end
         end
     })
-
-    -- 其他Tab
+    
+    --控制台 Tap
     local Tab2 = Window:MakeTab({Name = "控制台", Icon = "rbxassetid://7733779610"})
     Tab2:AddButton({Name = "控制台", Callback = function()
         loadstring(game:HttpGet("https://pastebin.com/raw/HfCtLtt9"))()
     end})
-
+    
+    -- XA脚本 Tab
     local Tab3 = Window:MakeTab({Name = "XA脚本", Icon = "rbxassetid://7733779610"})
     Tab3:AddButton({Name = "XA HUB", Callback = function()
         loadstring(game:HttpGet("https://xingtaiduan.pythonanywhere.com/Loader"))()
     end})
-
+    
+    --RB脚本中心 Tap
     local Tab4 = Window:MakeTab({Name = "RB脚本", Icon = "rbxassetid://7733779610"})
     Tab4:AddButton({Name = "Rb脚本", Callback = function()
         loadstring(game:HttpGet("https://raw.githubusercontent.com/Yungengxin/roblox/refs/heads/main/Rb-Hub"))()
     end})
-
+    
+    -- 生存与杀手 Tab
     local Tab5 = Window:MakeTab({Name = "生存与杀手", Icon = "rbxassetid://7733779610"})
     Tab5:AddButton({Name = "生存与杀手", Callback = function()
         loadstring(game:HttpGet("https://raw.githubusercontent.com/Milan08Studio/ChairWare/main/main.lua"))()
     end})
-
+    
+    --爱德华
     local Tab6 = Window:MakeTab({Name = "爱德华", Icon = "rbxassetid://7733779610"})
     Tab6:AddButton({Name = "爱德华", Callback = function()
         loadstring(game:HttpGet("https://raw.githubusercontent.com/gumanba/Scripts/main/Edward"))()
     end})
-
+    
+    --活了7天
     local Tab7 = Window:MakeTab({Name = "活了7天", Icon = "rbxassetid://7733779610"})
     Tab7:AddButton({Name = "活了7天", Callback = function()
         loadstring(game:HttpGet("https://rawscripts.net/raw/Universal-Script-7-days-to-live-36824"))()
     end})
-
+    
+    --死铁轨
     local Tab8 = Window:MakeTab({Name = "死铁轨", Icon = "rbxassetid://7733979610"})
     Tab8:AddButton({Name = "死铁轨", Callback = function()
         loadstring(game:HttpGet("https://raw.githubusercontent.com/iopjklbnmsss/SansHubScript/refs/heads/main/SansHub"))()
     end})
-
+    
     -- 启动
     OrionLib:Init()
 end)()
