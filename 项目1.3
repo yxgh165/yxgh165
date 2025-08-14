@@ -155,7 +155,7 @@
                     CreateKunKunAnimation()
                     
                     -- 延迟后显示主窗口
-                    wait(4.5)
+                    wait(2.5)
                     ShowMainWindow()
                 else
                     OrionLib:MakeNotification({
@@ -260,7 +260,7 @@
                 subText.Transparency = 0
                 wait(0.01)
             end
-            wait(2)  -- 显示2秒
+            wait(5)  -- 显示2秒
             
             -- 淡出动画
             for i = 0, 1, 0.05 do
@@ -1054,82 +1054,47 @@
             end
         })
         
-        --控制台 Tap
-        local Tab2 = Window:MakeTab({Name = "控制台", Icon = "rbxassetid://7733779610"})
-        Tab2:AddButton({
-            Name = "一键复制控制台脚本", 
-            Callback = function()
-                local script = "loadstring(game:HttpGet('https://pastebin.com/raw/HfCtLtt9'))()"
-                local success = CopyToClipboard(script)
-                ShowCopyNotification(success, "控制台脚本")
-            end
-        })
-        
-        -- XA脚本 Tab
-        local Tab3 = Window:MakeTab({Name = "XA脚本", Icon = "rbxassetid://7733779610"})
-        Tab3:AddButton({
-            Name = "一键复制XA HUB脚本", 
-            Callback = function()
-                local script = "loadstring(game:HttpGet('https://xingtaiduan.pythonanywhere.com/Loader'))()"
-                local success = CopyToClipboard(script)
-                ShowCopyNotification(success, "XA HUB脚本")
-            end
-        })
-        
-        --RB脚本中心 Tap
-        local Tab4 = Window:MakeTab({Name = "RB脚本", Icon = "rbxassetid://7733779610"})
-        Tab4:AddButton({
-            Name = "一键复制RB脚本", 
-            Callback = function()
-                local script = "loadstring(game:HttpGet('https://raw.githubusercontent.com/Yungengxin/roblox/refs/heads/main/Rb-Hub'))()"
-                local success = CopyToClipboard(script)
-                ShowCopyNotification(success, "RB脚本")
-            end
-        })
-        
-        -- 生存与杀手 Tab
-        local Tab5 = Window:MakeTab({Name = "生存与杀手", Icon = "rbxassetid://7733779610"})
-        Tab5:AddButton({
-            Name = "一键复制生存与杀手脚本", 
-            Callback = function()
-                local script = "loadstring(game:HttpGet('https://raw.githubusercontent.com/Milan08Studio/ChairWare/main/main.lua'))()"
-                local success = CopyToClipboard(script)
-                ShowCopyNotification(success, "生存与杀手脚本")
-            end
-        })
-        
-        --爱德华
-        local Tab6 = Window:MakeTab({Name = "爱德华", Icon = "rbxassetid://7733779610"})
-        Tab6:AddButton({
-            Name = "一键复制爱德华脚本", 
-            Callback = function()
-                local script = "loadstring(game:HttpGet('https://raw.githubusercontent.com/gumanba/Scripts/main/Edward'))()"
-                local success = CopyToClipboard(script)
-                ShowCopyNotification(success, "爱德华脚本")
-            end
-        })
-        
-        --活了7天
-        local Tab7 = Window:MakeTab({Name = "活了7天", Icon = "rbxassetid://7733779610"})
-        Tab7:AddButton({
-            Name = "一键复制活了7天脚本", 
-            Callback = function()
-                local script = "loadstring(game:HttpGet('https://rawscripts.net/raw/Universal-Script-7-days-to-live-36824'))()"
-                local success = CopyToClipboard(script)
-                ShowCopyNotification(success, "活了7天脚本")
-            end
-        })
-        
-        --死铁轨
-        local Tab8 = Window:MakeTab({Name = "死铁轨", Icon = "rbxassetid://7733979610"})
-        Tab8:AddButton({
-            Name = "一键复制死铁轨脚本", 
-            Callback = function()
-                local script = "loadstring(game:HttpGet('https://raw.githubusercontent.com/iopjklbnmsss/SansHubScript/refs/heads/main/SansHub'))()"
-                local success = CopyToClipboard(script)
-                ShowCopyNotification(success, "死铁轨脚本")
-            end
-        })
+--控制台 Tap
+    local Tab2 = Window:MakeTab({Name = "控制台", Icon = "rbxassetid://7733779610"})
+    Tab2:AddButton({Name = "控制台", Callback = function()
+        loadstring(game:HttpGet("https://pastebin.com/raw/HfCtLtt9"))()
+    end})
+    
+    -- XA脚本 Tab
+    local Tab3 = Window:MakeTab({Name = "XA脚本", Icon = "rbxassetid://7733779610"})
+    Tab3:AddButton({Name = "XA HUB", Callback = function()
+        loadstring(game:HttpGet("https://xingtaiduan.pythonanywhere.com/Loader"))()
+    end})
+    
+    --RB脚本中心 Tap
+    local Tab4 = Window:MakeTab({Name = "RB脚本", Icon = "rbxassetid://7733779610"})
+    Tab4:AddButton({Name = "Rb脚本", Callback = function()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/Yungengxin/roblox/refs/heads/main/Rb-Hub"))()
+    end})
+    
+    -- 生存与杀手 Tab
+    local Tab5 = Window:MakeTab({Name = "生存与杀手", Icon = "rbxassetid://7733779610"})
+    Tab5:AddButton({Name = "生存与杀手", Callback = function()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/Milan08Studio/ChairWare/main/main.lua"))()
+    end})
+    
+    --爱德华
+    local Tab6 = Window:MakeTab({Name = "爱德华", Icon = "rbxassetid://7733779610"})
+    Tab6:AddButton({Name = "爱德华", Callback = function()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/gumanba/Scripts/main/Edward"))()
+    end})
+    
+    --活了7天
+    local Tab7 = Window:MakeTab({Name = "活了7天", Icon = "rbxassetid://7733779610"})
+    Tab7:AddButton({Name = "活了7天", Callback = function()
+        loadstring(game:HttpGet("https://rawscripts.net/raw/Universal-Script-7-days-to-live-36824"))()
+    end})
+    
+    --死铁轨
+    local Tab8 = Window:MakeTab({Name = "死铁轨", Icon = "rbxassetid://7733979610"})
+    Tab8:AddButton({Name = "死铁轨", Callback = function()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/iopjklbnmsss/SansHubScript/refs/heads/main/SansHub"))()
+    end})
         
         -- 设置Tab - 卡密管理
         local SettingsTab = Window:MakeTab({Name = "设置", Icon = "rbxassetid://7733779610"})
