@@ -214,67 +214,107 @@
         end
     end
     
-    -- 坤坤大帝脚本动画
-    local function CreateKunKunAnimation()
-        -- 创建全屏背景
-        local bg = Drawing.new("Square")
-        bg.Size = workspace.CurrentCamera.ViewportSize
-        bg.Position = Vector2.new(0, 0)
-        bg.Color = Color3.new(0, 0, 0)
-        bg.Filled = true
-        bg.Transparency = 1
-        bg.Visible = true
-        bg.ZIndex = 999
+-- 坤坤大帝脚本弹性动画 (5秒版本)
+local function CreateKunKunAnimation()
+    -- 创建全屏背景
+    local bg = Drawing.new("Square")
+    bg.Size = workspace.CurrentCamera.ViewportSize
+    bg.Position = Vector2.new(0, 0)
+    bg.Color = Color3.new(0, 0, 0)
+    bg.Filled = true
+    bg.Transparency = 1
+    bg.Visible = true
+    bg.ZIndex = 999
+    
+    -- 创建坤坤大帝文字
+    local text = Drawing.new("Text")
+    text.Text = "坤坤大帝脚本"
+    text.Size = 100
+    text.Center = true
+    text.Position = Vector2.new(workspace.CurrentCamera.ViewportSize.X/2, -200) -- 初始位置在屏幕上方
+    text.Color = Color3.new(1, 0.2, 0.2)
+    text.Outline = true
+    text.OutlineColor = Color3.new(1, 1, 1)
+    text.Transparency = 0
+    text.Visible = true
+    text.ZIndex = 1000
+    
+    -- 创建副标题
+    local subText = Drawing.new("Text")
+    subText.Text = "尊享特权版 - 启动成功"
+    subText.Size = 40
+    subText.Center = true
+    subText.Position = Vector2.new(workspace.CurrentCamera.ViewportSize.X/2, -100) -- 初始位置在屏幕上方
+    subText.Color = Color3.new(0.8, 0.8, 1)
+    subText.Outline = true
+    subText.OutlineColor = Color3.new(0.2, 0.2, 0.2)
+    subText.Transparency = 0
+    subText.Visible = true
+    subText.ZIndex = 1000
+    
+    -- 弹性动画函数 (模拟弹簧物理效果)
+    local function elasticAnimation(obj, targetY, duration)
+        local startY = obj.Position.Y
+        local startTime = tick()
+        local damping = 0.7 -- 阻尼系数 (0-1)
+        local stiffness = 0.3 -- 弹性系数
         
-        -- 创建坤坤大帝文字
-        local text = Drawing.new("Text")
-        text.Text = "坤坤大帝脚本"
-        text.Size = 100
-        text.Center = true
-        text.Position = Vector2.new(workspace.CurrentCamera.ViewportSize.X/2, workspace.CurrentCamera.ViewportSize.Y/2)
-        text.Color = Color3.new(1, 0.2, 0.2)
-        text.Outline = true
-        text.OutlineColor = Color3.new(1, 1, 1)
-        text.Transparency = 0
-        text.Visible = true
-        text.ZIndex = 1000
-        
-        -- 创建副标题
-        local subText = Drawing.new("Text")
-        subText.Text = "尊享特权版 - 启动成功"
-        subText.Size = 40
-        subText.Center = true
-        subText.Position = Vector2.new(workspace.CurrentCamera.ViewportSize.X/2, workspace.CurrentCamera.ViewportSize.Y/2 + 80)
-        subText.Color = Color3.new(0.8, 0.8, 1)
-        subText.Outline = true
-        subText.OutlineColor = Color3.new(0.2, 0.2, 0.2)
-        subText.Transparency = 0
-        subText.Visible = true
-        subText.ZIndex = 1000
-        
-        -- 淡入动画
-        spawn(function()
-            for i = 0, 1, 0.05 do
-                bg.Transparency = 1 - i * 0.7
-                text.Transparency = 0
-                subText.Transparency = 0
-                wait(0.01)
-            end
-            wait(10)  -- 显示2秒
+        local connection
+        connection = game:GetService("RunService").RenderStepped:Connect(function()
+            local elapsed = tick() - startTime
+            local progress = elapsed / duration
             
-            -- 淡出动画
-            for i = 0, 1, 0.05 do
-                text.Transparency = i
-                subText.Transparency = i
-                wait(0.01)
+            if progress >= 1 then
+                obj.Position = Vector2.new(obj.Position.X, targetY)
+                connection:Disconnect()
+                return
             end
             
-            -- 移除绘图对象
-            bg:Remove()
-            text:Remove()
-            subText:Remove()
+            -- 弹性计算公式
+            local overshoot = math.sin(progress * math.pi * 4) * (1 - progress)
+            local newY = targetY + (startY - targetY) * math.pow(1 - progress, 2) * overshoot * stiffness
+            
+            -- 应用阻尼
+            stiffness = stiffness * damping
+            
+            obj.Position = Vector2.new(obj.Position.X, newY)
         end)
     end
+    
+    spawn(function()
+        -- 背景淡入
+        for i = 0, 1, 0.05 do
+            bg.Transparency = 1 - i * 0.7
+            wait(0.01)
+        end
+        
+        -- 主标题弹性下落 (目标Y位置是屏幕中心-100)
+        elasticAnimation(text, workspace.CurrentCamera.ViewportSize.Y/2 - 100, 1.5)
+        
+        -- 副标题延迟0.2秒后弹性下落
+        wait(0.2)
+        elasticAnimation(subText, workspace.CurrentCamera.ViewportSize.Y/2 + 20, 1.3)
+        
+        -- 总停留时间5秒 (从动画开始计算)
+        wait(3.5) -- 因为动画已经用了1.5秒
+        
+        -- 淡出动画
+        for i = 0, 1, 0.05 do
+            text.Transparency = i
+            subText.Transparency = i
+            bg.Transparency = 0.3 + i * 0.7
+            wait(0.01)
+        end
+        
+        -- 移除绘图对象
+        bg:Remove()
+        text:Remove()
+        subText:Remove()
+    end)
+end
+
+-- 调用动画函数
+CreateKunKunAnimation()
 
     -- 显示主窗口（验证通过后）
     local function ShowMainWindow()
