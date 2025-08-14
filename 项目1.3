@@ -75,6 +75,41 @@
         return false
     end
     
+    -- 复制到剪贴板函数（兼容多种执行器）
+    local function CopyToClipboard(text)
+        if setclipboard then
+            setclipboard(text)
+            return true
+        elseif writeclipboard then
+            writeclipboard(text)
+            return true
+        elseif toclipboard then
+            toclipboard(text)
+            return true
+        else
+            -- 对于不支持剪贴板的执行器，打印到控制台
+            print("[复制内容] " .. text)
+            return false
+        end
+    end
+    
+    -- 显示复制成功通知
+    local function ShowCopyNotification(success, content)
+        if success then
+            OrionLib:MakeNotification({
+                Name = "复制成功",
+                Content = "已复制到剪贴板: " .. content,
+                Time = 3
+            })
+        else
+            OrionLib:MakeNotification({
+                Name = "复制失败",
+                Content = "请手动复制控制台中的内容",
+                Time = 5
+            })
+        end
+    end
+
     -- 显示卡密验证窗口
     local function ShowKeyWindow()
         local KeyWindow = OrionLib:MakeWindow({
@@ -115,6 +150,12 @@
                     })
                     
                     KeyWindow:Destroy()
+                    
+                    -- 创建坤坤大帝脚本动画
+                    CreateKunKunAnimation()
+                    
+                    -- 延迟后显示主窗口
+                    wait(2.5)
                     ShowMainWindow()
                 else
                     OrionLib:MakeNotification({
@@ -138,6 +179,33 @@
             end
         })
         
+        -- 添加一键复制按钮
+        KeyTab:AddButton({
+            Name = "一键复制当前卡密",
+            Callback = function()
+                if KeySystem.CurrentKey and KeySystem.CurrentKey ~= "" then
+                    local success = CopyToClipboard(KeySystem.CurrentKey)
+                    ShowCopyNotification(success, KeySystem.CurrentKey)
+                else
+                    OrionLib:MakeNotification({
+                        Name = "复制失败",
+                        Content = "当前没有卡密可复制",
+                        Time = 3
+                    })
+                end
+            end
+        })
+        
+        -- 添加一键复制Discord链接按钮
+        KeyTab:AddButton({
+            Name = "一键复制Discord链接",
+            Callback = function()
+                local discordLink = "https://discord.gg/xVUf7H9M"
+                local success = CopyToClipboard(discordLink)
+                ShowCopyNotification(success, discordLink)
+            end
+        })
+        
         -- 自动填充已保存的卡密
         local savedKey = LoadKey()
         if savedKey then
@@ -146,6 +214,68 @@
         end
     end
     
+    -- 坤坤大帝脚本动画
+    local function CreateKunKunAnimation()
+        -- 创建全屏背景
+        local bg = Drawing.new("Square")
+        bg.Size = workspace.CurrentCamera.ViewportSize
+        bg.Position = Vector2.new(0, 0)
+        bg.Color = Color3.new(0, 0, 0)
+        bg.Filled = true
+        bg.Transparency = 1
+        bg.Visible = true
+        bg.ZIndex = 999
+        
+        -- 创建坤坤大帝文字
+        local text = Drawing.new("Text")
+        text.Text = "坤坤大帝脚本"
+        text.Size = 100
+        text.Center = true
+        text.Position = Vector2.new(workspace.CurrentCamera.ViewportSize.X/2, workspace.CurrentCamera.ViewportSize.Y/2)
+        text.Color = Color3.new(1, 0.2, 0.2)
+        text.Outline = true
+        text.OutlineColor = Color3.new(1, 1, 1)
+        text.Transparency = 0
+        text.Visible = true
+        text.ZIndex = 1000
+        
+        -- 创建副标题
+        local subText = Drawing.new("Text")
+        subText.Text = "尊享特权版 - 启动成功"
+        subText.Size = 40
+        subText.Center = true
+        subText.Position = Vector2.new(workspace.CurrentCamera.ViewportSize.X/2, workspace.CurrentCamera.ViewportSize.Y/2 + 80)
+        subText.Color = Color3.new(0.8, 0.8, 1)
+        subText.Outline = true
+        subText.OutlineColor = Color3.new(0.2, 0.2, 0.2)
+        subText.Transparency = 0
+        subText.Visible = true
+        subText.ZIndex = 1000
+        
+        -- 淡入动画
+        spawn(function()
+            for i = 0, 1, 0.05 do
+                bg.Transparency = 1 - i * 0.7
+                text.Transparency = 0
+                subText.Transparency = 0
+                wait(0.01)
+            end
+            wait(2)  -- 显示2秒
+            
+            -- 淡出动画
+            for i = 0, 1, 0.05 do
+                text.Transparency = i
+                subText.Transparency = i
+                wait(0.01)
+            end
+            
+            -- 移除绘图对象
+            bg:Remove()
+            text:Remove()
+            subText:Remove()
+        end)
+    end
+
     -- 显示主窗口（验证通过后）
     local function ShowMainWindow()
         -- 主窗口
@@ -175,7 +305,15 @@
         for k, v in pairs(getPlayer()) do
             Tab1:AddLabel(k .. "： " .. tostring(v))
         end
-        Tab1:AddButton({Name = "打印 QQ号", Callback = function() print("913348285") end})
+        
+        -- 添加一键复制QQ号按钮
+        Tab1:AddButton({
+            Name = "一键复制QQ号", 
+            Callback = function() 
+                local success = CopyToClipboard("913348285")
+                ShowCopyNotification(success, "913348285")
+            end
+        })
         
         -- 确保你前面有这行（放在 OrionLib 初始化后）
         local Tab4 = Window:MakeTab({Name = "人物功能", Icon = "rbxassetid://7733779610"})
@@ -918,45 +1056,80 @@
         
         --控制台 Tap
         local Tab2 = Window:MakeTab({Name = "控制台", Icon = "rbxassetid://7733779610"})
-        Tab2:AddButton({Name = "控制台", Callback = function()
-            loadstring(game:HttpGet("https://pastebin.com/raw/HfCtLtt9"))()
-        end})
+        Tab2:AddButton({
+            Name = "一键复制控制台脚本", 
+            Callback = function()
+                local script = "loadstring(game:HttpGet('https://pastebin.com/raw/HfCtLtt9'))()"
+                local success = CopyToClipboard(script)
+                ShowCopyNotification(success, "控制台脚本")
+            end
+        })
         
         -- XA脚本 Tab
         local Tab3 = Window:MakeTab({Name = "XA脚本", Icon = "rbxassetid://7733779610"})
-        Tab3:AddButton({Name = "XA HUB", Callback = function()
-            loadstring(game:HttpGet("https://xingtaiduan.pythonanywhere.com/Loader"))()
-        end})
+        Tab3:AddButton({
+            Name = "一键复制XA HUB脚本", 
+            Callback = function()
+                local script = "loadstring(game:HttpGet('https://xingtaiduan.pythonanywhere.com/Loader'))()"
+                local success = CopyToClipboard(script)
+                ShowCopyNotification(success, "XA HUB脚本")
+            end
+        })
         
         --RB脚本中心 Tap
         local Tab4 = Window:MakeTab({Name = "RB脚本", Icon = "rbxassetid://7733779610"})
-        Tab4:AddButton({Name = "Rb脚本", Callback = function()
-            loadstring(game:HttpGet("https://raw.githubusercontent.com/Yungengxin/roblox/refs/heads/main/Rb-Hub"))()
-        end})
+        Tab4:AddButton({
+            Name = "一键复制RB脚本", 
+            Callback = function()
+                local script = "loadstring(game:HttpGet('https://raw.githubusercontent.com/Yungengxin/roblox/refs/heads/main/Rb-Hub'))()"
+                local success = CopyToClipboard(script)
+                ShowCopyNotification(success, "RB脚本")
+            end
+        })
         
         -- 生存与杀手 Tab
         local Tab5 = Window:MakeTab({Name = "生存与杀手", Icon = "rbxassetid://7733779610"})
-        Tab5:AddButton({Name = "生存与杀手", Callback = function()
-            loadstring(game:HttpGet("https://raw.githubusercontent.com/Milan08Studio/ChairWare/main/main.lua"))()
-        end})
+        Tab5:AddButton({
+            Name = "一键复制生存与杀手脚本", 
+            Callback = function()
+                local script = "loadstring(game:HttpGet('https://raw.githubusercontent.com/Milan08Studio/ChairWare/main/main.lua'))()"
+                local success = CopyToClipboard(script)
+                ShowCopyNotification(success, "生存与杀手脚本")
+            end
+        })
         
         --爱德华
         local Tab6 = Window:MakeTab({Name = "爱德华", Icon = "rbxassetid://7733779610"})
-        Tab6:AddButton({Name = "爱德华", Callback = function()
-            loadstring(game:HttpGet("https://raw.githubusercontent.com/gumanba/Scripts/main/Edward"))()
-        end})
+        Tab6:AddButton({
+            Name = "一键复制爱德华脚本", 
+            Callback = function()
+                local script = "loadstring(game:HttpGet('https://raw.githubusercontent.com/gumanba/Scripts/main/Edward'))()"
+                local success = CopyToClipboard(script)
+                ShowCopyNotification(success, "爱德华脚本")
+            end
+        })
         
         --活了7天
         local Tab7 = Window:MakeTab({Name = "活了7天", Icon = "rbxassetid://7733779610"})
-        Tab7:AddButton({Name = "活了7天", Callback = function()
-            loadstring(game:HttpGet("https://rawscripts.net/raw/Universal-Script-7-days-to-live-36824"))()
-        end})
+        Tab7:AddButton({
+            Name = "一键复制活了7天脚本", 
+            Callback = function()
+                local script = "loadstring(game:HttpGet('https://rawscripts.net/raw/Universal-Script-7-days-to-live-36824'))()"
+                local success = CopyToClipboard(script)
+                ShowCopyNotification(success, "活了7天脚本")
+            end
+        })
         
         --死铁轨
         local Tab8 = Window:MakeTab({Name = "死铁轨", Icon = "rbxassetid://7733979610"})
-        Tab8:AddButton({Name = "死铁轨", Callback = function()
-            loadstring(game:HttpGet("https://raw.githubusercontent.com/iopjklbnmsss/SansHubScript/refs/heads/main/SansHub"))()
-        end})
+        Tab8:AddButton({
+            Name = "一键复制死铁轨脚本", 
+            Callback = function()
+                local script = "loadstring(game:HttpGet('https://raw.githubusercontent.com/iopjklbnmsss/SansHubScript/refs/heads/main/SansHub'))()"
+                local success = CopyToClipboard(script)
+                ShowCopyNotification(success, "死铁轨脚本")
+            end
+        })
         
         -- 设置Tab - 卡密管理
         local SettingsTab = Window:MakeTab({Name = "设置", Icon = "rbxassetid://7733779610"})
@@ -980,6 +1153,33 @@
         SettingsTab:AddLabel("卡密状态: " .. (KeySystem.CurrentKey and "已验证" or "未验证"))
         SettingsTab:AddLabel("当前卡密: " .. (KeySystem.CurrentKey or "无"))
         
+        -- 添加一键复制卡密按钮
+        SettingsTab:AddButton({
+            Name = "一键复制当前卡密",
+            Callback = function()
+                if KeySystem.CurrentKey and KeySystem.CurrentKey ~= "" then
+                    local success = CopyToClipboard(KeySystem.CurrentKey)
+                    ShowCopyNotification(success, KeySystem.CurrentKey)
+                else
+                    OrionLib:MakeNotification({
+                        Name = "复制失败",
+                        Content = "当前没有卡密可复制",
+                        Time = 3
+                    })
+                end
+            end
+        })
+        
+        -- 添加一键复制Discord链接按钮
+        SettingsTab:AddButton({
+            Name = "一键复制Discord链接",
+            Callback = function()
+                local discordLink = "https://discord.gg/xVUf7H9M"
+                local success = CopyToClipboard(discordLink)
+                ShowCopyNotification(success, discordLink)
+            end
+        })
+        
         -- 启动
         OrionLib:Init()
     end
@@ -989,6 +1189,12 @@
     if savedKey and VerifyKey(savedKey) then
         KeySystem.CurrentKey = savedKey
         KeySystem.IsVerified = true
+        
+        -- 创建坤坤大帝脚本动画
+        CreateKunKunAnimation()
+        
+        -- 延迟后显示主窗口
+        wait(2.5)
         ShowMainWindow()
     else
         -- 清除无效的已保存卡密
