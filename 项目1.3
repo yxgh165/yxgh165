@@ -601,7 +601,178 @@ CreateKunKunAnimation()
             end
         })
 
+-----------------------------------------------------------------
+        -- 飞行功能
+        -----------------------------------------------------------------
+        local flying = false
+        local flySpeed = 50
+        local bg, bv
+        local ctrl = {f = 0, b = 0, l = 0, r = 0}
+        local lastctrl = {f = 0, b = 0, l = 0, r = 0}
         
+        local function startFlying()
+            if flying then return end
+            flying = true
+            
+            local character = game.Players.LocalPlayer.Character
+            if not character then return end
+            
+            -- 禁用角色动画
+            character.Animate.Disabled = true
+            
+            -- 创建飞行控制组件
+            local torso = character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("Torso") or character:FindFirstChild("UpperTorso")
+            if not torso then return end
+            
+            bg = Instance.new("BodyGyro", torso)
+            bg.P = 9e4
+            bg.maxTorque = Vector3.new(9e9, 9e9, 9e9)
+            bg.cframe = torso.CFrame
+            
+            bv = Instance.new("BodyVelocity", torso)
+            bv.velocity = Vector3.new(0, 0.1, 0)
+            bv.maxForce = Vector3.new(9e9, 9e9, 9e9)
+            
+            game.Players.LocalPlayer.Character.Humanoid.PlatformStand = true
+            
+            -- 设置飞行状态
+            OrionLib:MakeNotification({
+                Name = "飞行模式",
+                Content = "飞行已启用 (速度: " .. flySpeed .. ")",
+                Time = 3
+            })
+            
+            -- 飞行控制循环
+            spawn(function()
+                while flying do
+                    wait()
+                    
+                    if ctrl.l + ctrl.r ~= 0 or ctrl.f + ctrl.b ~= 0 then
+                        speed = flySpeed
+                    else
+                        speed = 0
+                    end
+                    
+                    if (ctrl.l + ctrl.r) ~= 0 or (ctrl.f + ctrl.b) ~= 0 then
+                        bv.velocity = ((game.Workspace.CurrentCamera.CoordinateFrame.lookVector * (ctrl.f+ctrl.b)) + 
+                                       ((game.Workspace.CurrentCamera.CoordinateFrame * CFrame.new(ctrl.l+ctrl.r, (ctrl.f+ctrl.b)*.2, 0).p) - 
+                                       game.Workspace.CurrentCamera.CoordinateFrame.p) * speed
+                        lastctrl = {f = ctrl.f, b = ctrl.b, l = ctrl.l, r = ctrl.r}
+                    elseif (ctrl.l + ctrl.r) == 0 and (ctrl.f + ctrl.b) == 0 and speed ~= 0 then
+                        bv.velocity = ((game.Workspace.CurrentCamera.CoordinateFrame.lookVector * (lastctrl.f+lastctrl.b)) + 
+                                       ((game.Workspace.CurrentCamera.CoordinateFrame * CFrame.new(lastctrl.l+lastctrl.r, (lastctrl.f+lastctrl.b)*.2, 0).p) - 
+                                       game.Workspace.CurrentCamera.CoordinateFrame.p) * speed
+                    else
+                        bv.velocity = Vector3.new(0, 0, 0)
+                    end
+                    
+                    bg.cframe = game.Workspace.CurrentCamera.CoordinateFrame * CFrame.Angles(-math.rad((ctrl.f+ctrl.b)*50*speed/flySpeed), 0, 0)
+                end
+            end)
+        end
+        
+        local function stopFlying()
+            if not flying then return end
+            flying = false
+            
+            -- 清理飞行组件
+            if bg then bg:Destroy() end
+            if bv then bv:Destroy() end
+            
+            -- 恢复角色状态
+            local character = game.Players.LocalPlayer.Character
+            if character then
+                character.Humanoid.PlatformStand = false
+                character.Animate.Disabled = false
+            end
+            
+            OrionLib:MakeNotification({
+                Name = "飞行模式",
+                Content = "飞行已禁用",
+                Time = 3
+            })
+        end
+        
+        -- 键盘输入处理
+        local inputConn
+        local function setupInput()
+            if inputConn then inputConn:Disconnect() end
+            
+            inputConn = game:GetService("UserInputService").InputBegan:Connect(function(input)
+                if not flying then return end
+                
+                if input.KeyCode == Enum.KeyCode.W then
+                    ctrl.f = 1
+                elseif input.KeyCode == Enum.KeyCode.S then
+                    ctrl.b = -1
+                elseif input.KeyCode == Enum.KeyCode.A then
+                    ctrl.l = -1
+                elseif input.KeyCode == Enum.KeyCode.D then
+                    ctrl.r = 1
+                elseif input.KeyCode == Enum.KeyCode.Space then
+                    ctrl.f = 1 -- 空格键向上飞
+                elseif input.KeyCode == Enum.KeyCode.LeftControl then
+                    ctrl.b = -1 -- Ctrl键向下飞
+                end
+            end)
+            
+            inputConn = game:GetService("UserInputService").InputEnded:Connect(function(input)
+                if not flying then return end
+                
+                if input.KeyCode == Enum.KeyCode.W then
+                    ctrl.f = 0
+                elseif input.KeyCode == Enum.KeyCode.S then
+                    ctrl.b = 0
+                elseif input.KeyCode == Enum.KeyCode.A then
+                    ctrl.l = 0
+                elseif input.KeyCode == Enum.KeyCode.D then
+                    ctrl.r = 0
+                elseif input.KeyCode == Enum.KeyCode.Space then
+                    ctrl.f = 0
+                elseif input.KeyCode == Enum.KeyCode.LeftControl then
+                    ctrl.b = 0
+                end
+            end)
+        end
+        
+        -- 创建飞行控制UI
+        local flySection = Tab4:AddSection({Name = "飞行功能"})
+        
+        flySection:AddToggle({
+            Name = "启用飞行",
+            Default = false,
+            Callback = function(v)
+                if v then
+                    startFlying()
+                    setupInput()
+                else
+                    stopFlying()
+                end
+            end
+        })
+        
+        flySection:AddSlider({
+            Name = "飞行速度",
+            Min = 10,
+            Max = 200,
+            Default = flySpeed,
+            Increment = 5,
+            Callback = function(value)
+                flySpeed = value
+                if flying then
+                    OrionLib:MakeNotification({
+                        Name = "飞行模式",
+                        Content = "飞行速度更新为: " .. flySpeed,
+                        Time = 2
+                    })
+                end
+            end
+        })
+        
+        flySection:AddLabel("控制方式:")
+        flySection:AddLabel("W/A/S/D - 前后左右移动")
+        flySection:AddLabel("空格键 - 向上飞行")
+        flySection:AddLabel("Ctrl键 - 向下飞行")        
         
         -----------------------------------------------------------------
         -- ⑧ 增强版玩家 ESP（含队伍检测、距离、血条和可见性）
