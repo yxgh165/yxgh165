@@ -1,0 +1,92 @@
+-- 创建 ScreenGui
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "PlayerInfoDisplay"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = game.Players.LocalPlayer:WaitForChild("PlayerGui")
+
+-- 创建“控制台”按钮
+local consoleButton = Instance.new("TextButton")
+consoleButton.Size = UDim2.new(0, 100, 0, 30)
+consoleButton.Position = UDim2.new(1, -110, 0, 10)
+consoleButton.Text = "控制台"
+consoleButton.TextColor3 = Color3.new(1, 1, 0.5)
+consoleButton.BackgroundColor3 = Color3.new(0.1, 0.1, 0.1)
+consoleButton.BackgroundTransparency = 0.5
+consoleButton.Font = Enum.Font.SourceSansBold
+consoleButton.TextSize = 16
+consoleButton.Parent = screenGui
+consoleButton.MouseButton1Click:Connect(function()
+    game:GetService("VirtualInputManager"):SendKeyEvent(true, "F9", false, game)
+end)
+
+-- 创建“关闭UI”按钮
+local closeButton = Instance.new("TextButton")
+closeButton.Size = UDim2.new(0, 100, 0, 30)
+closeButton.Position = UDim2.new(1, -110, 0, 50)
+closeButton.Text = "关闭UI"
+closeButton.TextColor3 = Color3.new(1, 0, 0)
+closeButton.BackgroundColor3 = Color3.new(0.1, 0.1, 0.1)
+closeButton.BackgroundTransparency = 0.5
+closeButton.Font = Enum.Font.SourceSansBold
+closeButton.TextSize = 16
+closeButton.Parent = screenGui
+closeButton.MouseButton1Click:Connect(function()
+    screenGui:Destroy()
+end)
+
+-- 创建“隐藏UI”按钮
+local hideButton = Instance.new("TextButton")
+hideButton.Size = UDim2.new(0, 100, 0, 30)
+hideButton.Position = UDim2.new(1, -110, 0, 90)
+hideButton.Text = "隐藏UI"
+hideButton.TextColor3 = Color3.new(1, 0.5, 0)
+hideButton.BackgroundColor3 = Color3.new(0.1, 0.1, 0.1)
+hideButton.BackgroundTransparency = 0.5
+hideButton.Font = Enum.Font.SourceSansBold
+hideButton.TextSize = 16
+hideButton.Parent = screenGui
+
+-- 隐藏和显示 UI 的逻辑
+local isHidden = false
+hideButton.MouseButton1Click:Connect(function()
+    isHidden = not isHidden
+    consoleButton.Visible = not isHidden
+    closeButton.Visible = not isHidden
+    hideButton.Text = isHidden and "显示UI" or "隐藏UI"
+end)
+
+-- 拖动功能
+local dragging = false
+local dragInput
+local dragStart = nil
+local startPos = nil
+
+local function updatePos(input)
+    local delta = input.Position - dragStart
+    hideButton.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+end
+
+hideButton.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = hideButton.Position
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+end)
+
+hideButton.InputChanged:Connect(function(input)
+    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        dragInput = input
+    end
+end)
+
+game:GetService("UserInputService").InputChanged:Connect(function(input)
+    if dragging and input == dragInput then
+        updatePos(input)
+    end
+end)
