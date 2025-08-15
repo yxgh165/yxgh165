@@ -313,9 +313,6 @@ local function CreateKunKunAnimation()
     end)
 end
 
--- 调用动画函数
-CreateKunKunAnimation()
-
     -- 显示主窗口（验证通过后）
     local function ShowMainWindow()
         -- 主窗口
@@ -602,27 +599,94 @@ CreateKunKunAnimation()
         })
 
 -----------------------------------------------------------------
-        -- 飞行功能
+        -- 优化后的飞行功能 (修复bug并提高流畅度)
         -----------------------------------------------------------------
         local flying = false
         local flySpeed = 50
         local bg, bv
-        local ctrl = {f = 0, b = 0, l = 0, r = 0}
+        local ctrl = {f = 0, b = 0, l = 0, r = 0, u = 0, d = 0} -- 添加垂直方向控制
         local lastctrl = {f = 0, b = 0, l = 0, r = 0}
+        local flyConnection
+        
+        -- 更流畅的飞行循环
+        local function flyLoop()
+            while flying and game:GetService("RunService").Heartbeat:Wait() do
+                local character = game.Players.LocalPlayer.Character
+                if not character then break end
+                
+                local torso = character:FindFirstChild("HumanoidRootPart") or 
+                              character:FindFirstChild("Torso") or 
+                              character:FindFirstChild("UpperTorso")
+                if not torso then break end
+                
+                -- 计算移动方向
+                local moveDirection = Vector3.new(ctrl.r - ctrl.l, ctrl.u - ctrl.d, ctrl.b - ctrl.f)
+                if moveDirection.Magnitude > 0 then
+                    moveDirection = moveDirection.Unit
+                end
+                
+                -- 应用飞行速度
+                local camera = workspace.CurrentCamera
+                local cameraCFrame = camera.CFrame
+                local cameraLookVector = cameraCFrame.LookVector
+                local cameraRightVector = cameraCFrame.RightVector
+                local cameraUpVector = cameraCFrame.UpVector
+                
+                local velocity = (cameraLookVector * moveDirection.Z * flySpeed) +
+                                (cameraRightVector * moveDirection.X * flySpeed) +
+                                (cameraUpVector * moveDirection.Y * flySpeed)
+                
+                bv.Velocity = velocity
+                
+                -- 平滑旋转
+                if moveDirection.Magnitude > 0 then
+                    bg.CFrame = cameraCFrame * CFrame.Angles(
+                        -math.rad(moveDirection.Z * 15),
+                        math.rad(moveDirection.X * 15),
+                        0
+                    )
+                end
+            end
+        end
         
         local function startFlying()
             if flying then return end
-            flying = true
             
             local character = game.Players.LocalPlayer.Character
-            if not character then return end
+            if not character then 
+                OrionLib:MakeNotification({
+                    Name = "飞行错误",
+                    Content = "找不到角色",
+                    Time = 3
+                })
+                return 
+            end
             
-            -- 禁用角色动画
-            character.Animate.Disabled = true
+            local humanoid = character:FindFirstChildOfClass("Humanoid")
+            if not humanoid then 
+                OrionLib:MakeNotification({
+                    Name = "飞行错误",
+                    Content = "找不到Humanoid",
+                    Time = 3
+                })
+                return 
+            end
+            
+            flying = true
             
             -- 创建飞行控制组件
-            local torso = character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("Torso") or character:FindFirstChild("UpperTorso")
-            if not torso then return end
+            local torso = character:FindFirstChild("HumanoidRootPart") or 
+                          character:FindFirstChild("Torso") or 
+                          character:FindFirstChild("UpperTorso")
+            if not torso then 
+                flying = false
+                OrionLib:MakeNotification({
+                    Name = "飞行错误",
+                    Content = "找不到身体部位",
+                    Time = 3
+                })
+                return 
+            end
             
             bg = Instance.new("BodyGyro", torso)
             bg.P = 9e4
@@ -630,10 +694,10 @@ CreateKunKunAnimation()
             bg.cframe = torso.CFrame
             
             bv = Instance.new("BodyVelocity", torso)
-            bv.velocity = Vector3.new(0, 0.1, 0)
-            bv.maxForce = Vector3.new(9e9, 9e9, 9e9)
+            bv.Velocity = Vector3.new(0, 0.1, 0)
+            bv.MaxForce = Vector3.new(9e9, 9e9, 9e9)
             
-            game.Players.LocalPlayer.Character.Humanoid.PlatformStand = true
+            humanoid.PlatformStand = true
             
             -- 设置飞行状态
             OrionLib:MakeNotification({
@@ -642,33 +706,8 @@ CreateKunKunAnimation()
                 Time = 3
             })
             
-            -- 飞行控制循环
-            spawn(function()
-                while flying do
-                    wait()
-                    
-                    if ctrl.l + ctrl.r ~= 0 or ctrl.f + ctrl.b ~= 0 then
-                        speed = flySpeed
-                    else
-                        speed = 0
-                    end
-                    
-                    if (ctrl.l + ctrl.r) ~= 0 or (ctrl.f + ctrl.b) ~= 0 then
-                        bv.velocity = ((game.Workspace.CurrentCamera.CoordinateFrame.lookVector * (ctrl.f+ctrl.b)) + 
-                                       ((game.Workspace.CurrentCamera.CoordinateFrame * CFrame.new(ctrl.l+ctrl.r, (ctrl.f+ctrl.b)*.2, 0).p) - 
-                                       game.Workspace.CurrentCamera.CoordinateFrame.p) * speed
-                        lastctrl = {f = ctrl.f, b = ctrl.b, l = ctrl.l, r = ctrl.r}
-                    elseif (ctrl.l + ctrl.r) == 0 and (ctrl.f + ctrl.b) == 0 and speed ~= 0 then
-                        bv.velocity = ((game.Workspace.CurrentCamera.CoordinateFrame.lookVector * (lastctrl.f+lastctrl.b)) + 
-                                       ((game.Workspace.CurrentCamera.CoordinateFrame * CFrame.new(lastctrl.l+lastctrl.r, (lastctrl.f+lastctrl.b)*.2, 0).p) - 
-                                       game.Workspace.CurrentCamera.CoordinateFrame.p) * speed
-                    else
-                        bv.velocity = Vector3.new(0, 0, 0)
-                    end
-                    
-                    bg.cframe = game.Workspace.CurrentCamera.CoordinateFrame * CFrame.Angles(-math.rad((ctrl.f+ctrl.b)*50*speed/flySpeed), 0, 0)
-                end
-            end)
+            -- 启动飞行循环
+            flyConnection = game:GetService("RunService").Heartbeat:Connect(flyLoop)
         end
         
         local function stopFlying()
@@ -678,13 +717,24 @@ CreateKunKunAnimation()
             -- 清理飞行组件
             if bg then bg:Destroy() end
             if bv then bv:Destroy() end
+            if flyConnection then flyConnection:Disconnect() end
             
             -- 恢复角色状态
             local character = game.Players.LocalPlayer.Character
             if character then
-                character.Humanoid.PlatformStand = false
-                character.Animate.Disabled = false
+                local humanoid = character:FindFirstChildOfClass("Humanoid")
+                if humanoid then
+                    humanoid.PlatformStand = false
+                end
+                
+                local animate = character:FindFirstChild("Animate")
+                if animate then
+                    animate.Disabled = false
+                end
             end
+            
+            -- 重置控制变量
+            ctrl = {f = 0, b = 0, l = 0, r = 0, u = 0, d = 0}
             
             OrionLib:MakeNotification({
                 Name = "飞行模式",
@@ -693,30 +743,35 @@ CreateKunKunAnimation()
             })
         end
         
-        -- 键盘输入处理
-        local inputConn
+        -- 键盘输入处理 (优化版本)
+        local inputBeganConn, inputEndedConn
+        
         local function setupInput()
-            if inputConn then inputConn:Disconnect() end
+            -- 清除旧连接
+            if inputBeganConn then inputBeganConn:Disconnect() end
+            if inputEndedConn then inputEndedConn:Disconnect() end
             
-            inputConn = game:GetService("UserInputService").InputBegan:Connect(function(input)
+            -- 键盘按下事件
+            inputBeganConn = game:GetService("UserInputService").InputBegan:Connect(function(input)
                 if not flying then return end
                 
                 if input.KeyCode == Enum.KeyCode.W then
                     ctrl.f = 1
                 elseif input.KeyCode == Enum.KeyCode.S then
-                    ctrl.b = -1
+                    ctrl.b = 1
                 elseif input.KeyCode == Enum.KeyCode.A then
-                    ctrl.l = -1
+                    ctrl.l = 1
                 elseif input.KeyCode == Enum.KeyCode.D then
                     ctrl.r = 1
                 elseif input.KeyCode == Enum.KeyCode.Space then
-                    ctrl.f = 1 -- 空格键向上飞
-                elseif input.KeyCode == Enum.KeyCode.LeftControl then
-                    ctrl.b = -1 -- Ctrl键向下飞
+                    ctrl.u = 1
+                elseif input.KeyCode == Enum.KeyCode.LeftControl or input.KeyCode == Enum.KeyCode.ButtonL3 then
+                    ctrl.d = 1
                 end
             end)
             
-            inputConn = game:GetService("UserInputService").InputEnded:Connect(function(input)
+            -- 键盘释放事件
+            inputEndedConn = game:GetService("UserInputService").InputEnded:Connect(function(input)
                 if not flying then return end
                 
                 if input.KeyCode == Enum.KeyCode.W then
@@ -728,12 +783,17 @@ CreateKunKunAnimation()
                 elseif input.KeyCode == Enum.KeyCode.D then
                     ctrl.r = 0
                 elseif input.KeyCode == Enum.KeyCode.Space then
-                    ctrl.f = 0
-                elseif input.KeyCode == Enum.KeyCode.LeftControl then
-                    ctrl.b = 0
+                    ctrl.u = 0
+                elseif input.KeyCode == Enum.KeyCode.LeftControl or input.KeyCode == Enum.KeyCode.ButtonL3 then
+                    ctrl.d = 0
                 end
             end)
         end
+        
+        -- 角色死亡时自动停止飞行
+        game.Players.LocalPlayer.CharacterAdded:Connect(function()
+            stopFlying()
+        end)
         
         -- 创建飞行控制UI
         local flySection = Tab4:AddSection({Name = "飞行功能"})
