@@ -1,0 +1,328 @@
+-- 一键复制即可使用的完整坤坤大帝脚本
+(function()
+    -- 初始化
+    local OrionLib = loadstring(game:HttpGet("https://raw.githubusercontent.com/wsomoQaz/lua-/main/Xcccc"))()
+    local Players = game:GetService("Players")
+    local LocalPlayer = Players.LocalPlayer
+    local Camera = workspace.CurrentCamera
+    local Mouse = LocalPlayer:GetMouse()
+    local RunService = game:GetService("RunService")
+
+    -- 卡密系统
+    local KeySystem = {
+        CurrentKey = nil,
+        IsVerified = false,
+        KeyFile = "KunKunKey.txt",
+        ValidKeys = {"2025","666","KUNKUN666","666free","TAIYOUYISILE"}
+    }
+
+    -- 保存/加载卡密
+    local function SaveKey(key)
+        if writefile then writefile(KeySystem.KeyFile, key) end
+    end
+    local function LoadKey()
+        if isfile and isfile(KeySystem.KeyFile) then return readfile(KeySystem.KeyFile) end
+        return nil
+    end
+
+    -- 高级瞄准系统
+    local AimBot = {
+        Enabled = false,
+        SilentAim = false,
+        TargetNPCs = true,
+        FOV = 120,
+        Smoothness = 0.3,
+        HitChance = 95,
+        Prediction = 0.12,
+        BonePriority = {"Head","UpperTorso","HumanoidRootPart"},
+        LastShot = 0,
+        ShotDelay = 0.1,
+        
+        GetTarget = function(self)
+            local bestTarget, bestDistance = nil, self.FOV
+            local localChar = LocalPlayer.Character
+            if not localChar then return nil end
+            
+            -- 检查玩家
+            for _, player in ipairs(Players:GetPlayers()) do
+                if player == LocalPlayer then continue end
+                
+                local char = player.Character
+                if not char then continue end
+                
+                local humanoid = char:FindFirstChildOfClass("Humanoid")
+                if not humanoid or humanoid.Health <= 0 then continue end
+                
+                for _, boneName in ipairs(self.BonePriority) do
+                    local bone = char:FindFirstChild(boneName)
+                    if bone then
+                        local screenPos = Camera:WorldToScreenPoint(bone.Position)
+                        if screenPos.Z > 0 then
+                            local distance = (Vector2.new(screenPos.X, screenPos.Y) - Vector2.new(Mouse.X, Mouse.Y)).Magnitude
+                            if distance < bestDistance then
+                                bestDistance = distance
+                                bestTarget = {
+                                    Part = bone,
+                                    Position = bone.Position + (char:FindFirstChild("HumanoidRootPart") and 
+                                        char.HumanoidRootPart.Velocity * self.Prediction or Vector3.new())
+                                }
+                            end
+                        end
+                        break
+                    end
+                end
+            end
+            
+            -- 检查NPC (优化版)
+            if self.TargetNPCs then
+                for _, model in ipairs(workspace:GetDescendants()) do
+                    if model:IsA("Model") and model ~= localChar then
+                        local humanoid = model:FindFirstChildOfClass("Humanoid")
+                        if humanoid and humanoid.Health > 0 then
+                            for _, boneName in ipairs(self.BonePriority) do
+                                local bone = model:FindFirstChild(boneName)
+                                if bone then
+                                    local screenPos = Camera:WorldToScreenPoint(bone.Position)
+                                    if screenPos.Z > 0 then
+                                        local distance = (Vector2.new(screenPos.X, screenPos.Y) - Vector2.new(Mouse.X, Mouse.Y)).Magnitude
+                                        if distance < bestDistance then
+                                            bestDistance = distance
+                                            bestTarget = {
+                                                Part = bone,
+                                                Position = bone.Position + (model:FindFirstChild("HumanoidRootPart") and 
+                                                    model.HumanoidRootPart.Velocity * self.Prediction or Vector3.new())
+                                            }
+                                        end
+                                    end
+                                    break
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+            
+            return bestTarget
+        end,
+        
+        AimAt = function(self, target)
+            if not target or tick() - self.LastShot < self.ShotDelay then return end
+            if math.random(1, 100) > self.HitChance then return end
+            
+            local currentCF = Camera.CFrame
+            local targetCF = CFrame.new(currentCF.Position, target.Position)
+            local newLook = currentCF.LookVector:Lerp(targetCF.LookVector, self.Smoothness)
+            
+            Camera.CFrame = CFrame.new(currentCF.Position, currentCF.Position + newLook)
+            
+            mouse1press()
+            task.wait(0.05)
+            mouse1release()
+            self.LastShot = tick()
+        end,
+        
+        HookSilentAim = function(self)
+            local mt = getrawmetatable(game)
+            local oldIndex = mt.__index
+            setreadonly(mt, false)
+            
+            mt.__index = newcclosure(function(t, k)
+                if k == "Hit" and self.SilentAim then
+                    local target = self:GetTarget()
+                    if target then
+                        return target.Part.CFrame + Vector3.new(
+                            (math.random() - 0.5) * 0.2,
+                            math.random() * 0.1,
+                            (math.random() - 0.5) * 0.2
+                        )
+                    end
+                end
+                return oldIndex(t, k)
+            end)
+            
+            setreadonly(mt, true)
+        end
+    }
+
+    -- 初始化Silent Aim
+    AimBot:HookSilentAim()
+
+    -- 显示主窗口
+    local function ShowMainWindow()
+        local Window = OrionLib:MakeWindow({
+            Name = "坤坤大帝脚本",
+            HidePremium = false,
+            SaveConfig = true,
+            ConfigFolder = "KunKunConfig"
+        })
+        
+        -- 瞄准设置
+        local AimTab = Window:MakeTab({Name = "瞄准系统", Icon = "rbxassetid://7733779610"})
+        
+        AimTab:AddToggle({Name = "启用Aimbot", Default = false, Callback = function(v) AimBot.Enabled = v end})
+        AimTab:AddToggle({Name = "启用Silent Aim", Default = false, Callback = function(v) AimBot.SilentAim = v end})
+        AimTab:AddToggle({Name = "瞄准NPC", Default = true, Callback = function(v) AimBot.TargetNPCs = v end})
+        
+        AimTab:AddTextbox({
+            Name = "骨骼优先级 (用逗号分隔)",
+            Default = table.concat(AimBot.BonePriority, ","),
+            Callback = function(txt)
+                local bones = {}
+                for bone in string.gmatch(txt, "[^,]+") do
+                    table.insert(bones, bone:match("^%s*(.-)%s*$"))
+                end
+                if #bones > 0 then AimBot.BonePriority = bones end
+            end
+        })
+        
+        AimTab:AddTextbox({
+            Name = "FOV半径",
+            Default = tostring(AimBot.FOV),
+            Callback = function(txt)
+                local num = tonumber(txt)
+                if num then AimBot.FOV = math.max(0, num) end
+            end
+        })
+        
+        AimTab:AddTextbox({
+            Name = "平滑度 (0.1-1)",
+            Default = tostring(AimBot.Smoothness),
+            Callback = function(txt)
+                local num = tonumber(txt)
+                if num then AimBot.Smoothness = math.clamp(num, 0.1, 1) end
+            end
+        })
+        
+        AimTab:AddTextbox({
+            Name = "命中率 (1-100)",
+            Default = tostring(AimBot.HitChance),
+            Callback = function(txt)
+                local num = tonumber(txt)
+                if num then AimBot.HitChance = math.clamp(num, 1, 100) end
+            end
+        })
+        
+        AimTab:AddTextbox({
+            Name = "预测值 (0-0.5)",
+            Default = tostring(AimBot.Prediction),
+            Callback = function(txt)
+                local num = tonumber(txt)
+                if num then AimBot.Prediction = math.clamp(num, 0, 0.5) end
+            end
+        })
+        
+        AimTab:AddTextbox({
+            Name = "射击延迟 (秒)",
+            Default = tostring(AimBot.ShotDelay),
+            Callback = function(txt)
+                local num = tonumber(txt)
+                if num then AimBot.ShotDelay = math.max(0.05, num) end
+            end
+        })
+        
+        -- 其他功能
+        local MiscTab = Window:MakeTab({Name = "其他功能", Icon = "rbxassetid://7733779610"})
+        
+        MiscTab:AddButton({
+            Name = "飞行模式",
+            Callback = function()
+                loadstring(game:HttpGet("https://raw.githubusercontent.com/XNEOFF/FlyGuiV3/main/FlyGuiV3.txt"))()
+            end
+        })
+        
+        MiscTab:AddButton({
+            Name = "穿墙模式",
+            Callback = function()
+                local Char = LocalPlayer.Character
+                if Char then
+                    for _, part in ipairs(Char:GetDescendants()) do
+                        if part:IsA("BasePart") then
+                            part.CanCollide = false
+                        end
+                    end
+                    OrionLib:MakeNotification({Name = "提示", Content = "穿墙模式已激活", Time = 3})
+                end
+            end
+        })
+        
+        -- 主循环
+        RunService.RenderStepped:Connect(function()
+            if AimBot.Enabled then
+                local target = AimBot:GetTarget()
+                if target then
+                    AimBot:AimAt(target)
+                end
+            end
+        end)
+        
+        OrionLib:Init()
+    end
+
+    -- 卡密验证窗口
+    local function ShowKeyWindow()
+        local KeyWindow = OrionLib:MakeWindow({
+            Name = "卡密验证",
+            HidePremium = true,
+            SaveConfig = false,
+            IntroEnabled = false
+        })
+        
+        local KeyTab = KeyWindow:MakeTab({Name = "验证", Icon = "rbxassetid://4370345174"})
+        
+        KeyTab:AddLabel("请输入卡密以使用脚本")
+        KeyTab:AddParagraph("提示", "卡密区分大小写，请确保输入正确")
+        
+        local KeyBox = KeyTab:AddTextbox({
+            Name = "输入卡密",
+            Default = "",
+            TextDisappear = false,
+            Callback = function(Value)
+                KeySystem.CurrentKey = Value
+            end
+        })
+        
+        KeyTab:AddButton({
+            Name = "验证卡密",
+            Callback = function()
+                if KeySystem.CurrentKey then
+                    local valid = false
+                    for _, key in ipairs(KeySystem.ValidKeys) do
+                        if KeySystem.CurrentKey == key then
+                            valid = true
+                            break
+                        end
+                    end
+                    
+                    if valid then
+                        KeySystem.IsVerified = true
+                        SaveKey(KeySystem.CurrentKey)
+                        KeyWindow:Destroy()
+                        ShowMainWindow()
+                    else
+                        OrionLib:MakeNotification({Name = "错误", Content = "卡密无效", Time = 3})
+                    end
+                end
+            end
+        })
+        
+        -- 自动填充已保存的卡密
+        local savedKey = LoadKey()
+        if savedKey then KeyBox:Set(savedKey) end
+    end
+
+    -- 启动脚本
+    local savedKey = LoadKey()
+    if savedKey then
+        for _, key in ipairs(KeySystem.ValidKeys) do
+            if savedKey == key then
+                KeySystem.CurrentKey = savedKey
+                KeySystem.IsVerified = true
+                task.wait(1)
+                ShowMainWindow()
+                return
+            end
+        end
+    end
+    
+    ShowKeyWindow()
+end)()
