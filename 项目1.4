@@ -697,6 +697,24 @@
                 OrionLib:MakeNotification({Name = "提示", Content = v and "阴影已删除" or "阴影已恢复", Time = 2})
             end
         })
+        
+        -----------------------------------------------------------------
+        -- 穿墙模式
+        -----------------------------------------------------------------
+        Tab4:AddButton({
+            Name = "穿墙模式",
+            Callback = function()
+                local Char = LocalPlayer.Character
+                if Char then
+                    for _, part in ipairs(Char:GetDescendants()) do
+                        if part:IsA("BasePart") then
+                            part.CanCollide = false
+                        end
+                    end
+                    OrionLib:MakeNotification({Name = "提示", Content = "穿墙模式已激活", Time = 3})
+                end
+            end
+        })
 
         -----------------------------------------------------------------
         -- 优化后的飞行功能
