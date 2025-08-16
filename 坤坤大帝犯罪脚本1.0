@@ -1,328 +1,217 @@
--- 一键复制即可使用的完整坤坤大帝脚本
-(function()
-    -- 初始化
-    local OrionLib = loadstring(game:HttpGet("https://raw.githubusercontent.com/wsomoQaz/lua-/main/Xcccc"))()
-    local Players = game:GetService("Players")
-    local LocalPlayer = Players.LocalPlayer
-    local Camera = workspace.CurrentCamera
-    local Mouse = LocalPlayer:GetMouse()
-    local RunService = game:GetService("RunService")
+--[[  ===== 忍者注入器-NinjaInjector v1.0 =====  ]]
+--  功能：1. 原地加载整套 GUI
+--        2. 支持热键隐藏/显示（默认 RightShift）
+--        3. 支持双击顶部拖动条快速最小化
+--        4. 支持自动保存配置（本地）
+--  用法：require(脚本) 即可，零配置
+---------------------------------------------------
 
-    -- 卡密系统
-    local KeySystem = {
-        CurrentKey = nil,
-        IsVerified = false,
-        KeyFile = "KunKunKey.txt",
-        ValidKeys = {"2025","666","KUNKUN666","666free","TAIYOUYISILE"}
-    }
+local player = game:GetService("Players").LocalPlayer
+local UIS    = game:GetService("UserInputService")
+local TS     = game:GetService("TweenService")
+local Http   = game:GetService("HttpService")
 
-    -- 保存/加载卡密
-    local function SaveKey(key)
-        if writefile then writefile(KeySystem.KeyFile, key) end
+-- 防止重复注入
+if player:FindFirstChild("__NINJA_MARKER") then return end
+local marker = Instance.new("BoolValue"); marker.Name = "__NINJA_MARKER"; marker.Parent = player
+
+---------------------------------------------------
+-- 1) 保存/读取本地配置
+---------------------------------------------------
+local CONFIG = { minimised = false, visible = true }
+local CONFIG_NAME = "NinjaConfig.json"
+
+local function loadConfig()
+    local suc, data = pcall(function()
+        return Http:JSONDecode(readfile(CONFIG_NAME))
+    end)
+    if suc then
+        for k,v in pairs(data) do CONFIG[k]=v end
     end
-    local function LoadKey()
-        if isfile and isfile(KeySystem.KeyFile) then return readfile(KeySystem.KeyFile) end
-        return nil
+end
+
+local function saveConfig()
+    writefile(CONFIG_NAME, Http:JSONEncode(CONFIG))
+end
+
+-- 仅在支持文件系统的环境执行（Synapse, Script-Ware, KRNL…）
+if isfile and writefile then
+    loadConfig()
+end
+
+---------------------------------------------------
+-- 2) GUI 初始化
+---------------------------------------------------
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "NinjaGui"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = player:WaitForChild("PlayerGui")
+
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = CONFIG.minimised and UDim2.new(0,0,0,0) or UDim2.new(0.4,0,0.6,0)
+mainFrame.Position = UDim2.new(0.5,0,0.5,0)
+mainFrame.AnchorPoint = Vector2.new(0.5,0.5)
+mainFrame.BackgroundTransparency = 0.3
+mainFrame.Parent = screenGui
+
+local g = Instance.new("UIGradient")
+g.Color = ColorSequence.new{
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(255,0,128)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(0,0,255))
+}
+g.Rotation = 45
+g.Parent = mainFrame
+
+Instance.new("UICorner").Parent = mainFrame
+
+-- 拖动条（双击最小化）
+local dragBar = Instance.new("TextButton")
+dragBar.Size = UDim2.new(1,0,0,20)
+dragBar.BackgroundTransparency = 1
+dragBar.Text = ""
+dragBar.Parent = mainFrame
+MakeDraggable(mainFrame, dragBar)
+
+-- 双击最小化
+local lastClick = 0
+dragBar.MouseButton1Click:Connect(function()
+    local now = tick()
+    if now - lastClick < 0.3 then
+        toggleMinimise()
+    end
+    lastClick = now
+end)
+
+---------------------------------------------------
+-- 3) 侧边栏 & 页面（沿用你原本逻辑，精简）
+---------------------------------------------------
+local buttonsFrame = Instance.new("Frame")
+buttonsFrame.Size = UDim2.new(0.25,0,0.9,0)
+buttonsFrame.Position = UDim2.new(0.02,0,0.05,0)
+buttonsFrame.BackgroundTransparency = 0.5
+buttonsFrame.Visible = not CONFIG.minimised
+buttonsFrame.Parent = mainFrame
+Instance.new("UICorner").Parent = buttonsFrame)
+
+local list = Instance.new("UIListLayout")
+list.Parent = buttonsFrame
+list.Padding = UDim.new(0.05,0)
+
+local pages = {}
+local currentPage
+
+local buttonTexts = {"公告","绘制","功能","杂项"}
+
+-- 创建页面函数
+local function createPage(name)
+    local p = Instance.new("Frame")
+    p.Name = name
+    p.Size = UDim2.new(0.7,0,0.8,0)
+    p.Position = UDim2.new(0.28,0,0.1,0)
+    p.BackgroundTransparency = 0.5
+    p.BackgroundColor3 = Color3.new(1,1,1)
+    p.Visible = false
+    p.Parent = mainFrame
+    Instance.new("UICorner").Parent = p
+
+    -- ScrollingFrame 示例
+    local sf = Instance.new("ScrollingFrame")
+    sf.Size = UDim2.new(1,0,0.8,0)
+    sf.BackgroundTransparency = 1
+    sf.ScrollBarThickness = 5
+    sf.CanvasSize = UDim2.new(0,0,2,0)
+    sf.Parent = p
+
+    for i=1,10 do
+        local lb = Instance.new("TextLabel")
+        lb.Size = UDim2.new(1,0,0.1,0)
+        lb.Position = UDim2.new(0,0,0.1*(i-1),0)
+        lb.BackgroundTransparency = 1
+        lb.Text = name.." 内容 "..i
+        lb.TextColor3 = Color3.new(0,0,0)
+        lb.Font = Enum.Font.SourceSansBold
+        lb.TextSize = 16
+        lb.Parent = sf
     end
 
-    -- 高级瞄准系统
-    local AimBot = {
-        Enabled = false,
-        SilentAim = false,
-        TargetNPCs = true,
-        FOV = 120,
-        Smoothness = 0.3,
-        HitChance = 95,
-        Prediction = 0.12,
-        BonePriority = {"Head","UpperTorso","HumanoidRootPart"},
-        LastShot = 0,
-        ShotDelay = 0.1,
-        
-        GetTarget = function(self)
-            local bestTarget, bestDistance = nil, self.FOV
-            local localChar = LocalPlayer.Character
-            if not localChar then return nil end
-            
-            -- 检查玩家
-            for _, player in ipairs(Players:GetPlayers()) do
-                if player == LocalPlayer then continue end
-                
-                local char = player.Character
-                if not char then continue end
-                
-                local humanoid = char:FindFirstChildOfClass("Humanoid")
-                if not humanoid or humanoid.Health <= 0 then continue end
-                
-                for _, boneName in ipairs(self.BonePriority) do
-                    local bone = char:FindFirstChild(boneName)
-                    if bone then
-                        local screenPos = Camera:WorldToScreenPoint(bone.Position)
-                        if screenPos.Z > 0 then
-                            local distance = (Vector2.new(screenPos.X, screenPos.Y) - Vector2.new(Mouse.X, Mouse.Y)).Magnitude
-                            if distance < bestDistance then
-                                bestDistance = distance
-                                bestTarget = {
-                                    Part = bone,
-                                    Position = bone.Position + (char:FindFirstChild("HumanoidRootPart") and 
-                                        char.HumanoidRootPart.Velocity * self.Prediction or Vector3.new())
-                                }
-                            end
-                        end
-                        break
-                    end
+    return p
+end
+
+-- 初始化
+for _,txt in ipairs(buttonTexts) do
+    pages[txt] = createPage(txt)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0.9,0,0.12,0)
+    btn.Text = txt
+    btn.BackgroundColor3 = Color3.fromRGB(0,0,0)
+    btn.BackgroundTransparency = 0.5
+    btn.TextColor3 = Color3.new(1,1,1)
+    btn.Font = Enum.Font.SourceSansBold
+    btn.TextSize = 16
+    btn.Parent = buttonsFrame
+    Instance.new("UICorner").Parent = btn
+    btn.MouseButton1Click:Connect(function()
+        if currentPage then currentPage.Visible=false end
+        pages[txt].Visible = true
+        currentPage = pages[txt]
+    end)
+end
+
+---------------------------------------------------
+-- 4) 最小化/展开
+---------------------------------------------------
+function toggleMinimise()
+    CONFIG.minimised = not CONFIG.minimised
+    if CONFIG.minimised then
+        TS:Create(mainFrame, TweenInfo.new(0.3), {Size=UDim2.new(0,0,0,0)}):Play()
+        buttonsFrame.Visible = false
+    else
+        TS:Create(mainFrame, TweenInfo.new(0.3), {Size=UDim2.new(0.4,0,0.6,0)}):Play()
+        buttonsFrame.Visible = true
+    end
+    if writefile then saveConfig() end
+end
+
+---------------------------------------------------
+-- 5) 热键隐藏/显示
+---------------------------------------------------
+UIS.InputBegan:Connect(function(inp, gpe)
+    if gpe then return end
+    if inp.KeyCode == Enum.KeyCode.RightShift then
+        CONFIG.visible = not CONFIG.visible
+        screenGui.Enabled = CONFIG.visible
+        if writefile then saveConfig() end
+    end
+end)
+
+---------------------------------------------------
+-- 6) 工具：拖动函数
+---------------------------------------------------
+function MakeDraggable(obj, handle)
+    handle = handle or obj
+    local drag, input, start, pos
+    handle.InputBegan:Connect(function(inp)
+        if inp.UserInputType == Enum.UserInputType.MouseButton1 then
+            drag = true
+            start = inp.Position
+            pos = obj.Position
+            inp.Changed:Connect(function()
+                if inp.UserInputState == Enum.UserInputState.End then
+                    drag = false
                 end
-            end
-            
-            -- 检查NPC (优化版)
-            if self.TargetNPCs then
-                for _, model in ipairs(workspace:GetDescendants()) do
-                    if model:IsA("Model") and model ~= localChar then
-                        local humanoid = model:FindFirstChildOfClass("Humanoid")
-                        if humanoid and humanoid.Health > 0 then
-                            for _, boneName in ipairs(self.BonePriority) do
-                                local bone = model:FindFirstChild(boneName)
-                                if bone then
-                                    local screenPos = Camera:WorldToScreenPoint(bone.Position)
-                                    if screenPos.Z > 0 then
-                                        local distance = (Vector2.new(screenPos.X, screenPos.Y) - Vector2.new(Mouse.X, Mouse.Y)).Magnitude
-                                        if distance < bestDistance then
-                                            bestDistance = distance
-                                            bestTarget = {
-                                                Part = bone,
-                                                Position = bone.Position + (model:FindFirstChild("HumanoidRootPart") and 
-                                                    model.HumanoidRootPart.Velocity * self.Prediction or Vector3.new())
-                                            }
-                                        end
-                                    end
-                                    break
-                                end
-                            end
-                        end
-                    end
-                end
-            end
-            
-            return bestTarget
-        end,
-        
-        AimAt = function(self, target)
-            if not target or tick() - self.LastShot < self.ShotDelay then return end
-            if math.random(1, 100) > self.HitChance then return end
-            
-            local currentCF = Camera.CFrame
-            local targetCF = CFrame.new(currentCF.Position, target.Position)
-            local newLook = currentCF.LookVector:Lerp(targetCF.LookVector, self.Smoothness)
-            
-            Camera.CFrame = CFrame.new(currentCF.Position, currentCF.Position + newLook)
-            
-            mouse1press()
-            task.wait(0.05)
-            mouse1release()
-            self.LastShot = tick()
-        end,
-        
-        HookSilentAim = function(self)
-            local mt = getrawmetatable(game)
-            local oldIndex = mt.__index
-            setreadonly(mt, false)
-            
-            mt.__index = newcclosure(function(t, k)
-                if k == "Hit" and self.SilentAim then
-                    local target = self:GetTarget()
-                    if target then
-                        return target.Part.CFrame + Vector3.new(
-                            (math.random() - 0.5) * 0.2,
-                            math.random() * 0.1,
-                            (math.random() - 0.5) * 0.2
-                        )
-                    end
-                end
-                return oldIndex(t, k)
             end)
-            
-            setreadonly(mt, true)
         end
-    }
-
-    -- 初始化Silent Aim
-    AimBot:HookSilentAim()
-
-    -- 显示主窗口
-    local function ShowMainWindow()
-        local Window = OrionLib:MakeWindow({
-            Name = "坤坤大帝脚本",
-            HidePremium = false,
-            SaveConfig = true,
-            ConfigFolder = "KunKunConfig"
-        })
-        
-        -- 瞄准设置
-        local AimTab = Window:MakeTab({Name = "瞄准系统", Icon = "rbxassetid://7733779610"})
-        
-        AimTab:AddToggle({Name = "启用Aimbot", Default = false, Callback = function(v) AimBot.Enabled = v end})
-        AimTab:AddToggle({Name = "启用Silent Aim", Default = false, Callback = function(v) AimBot.SilentAim = v end})
-        AimTab:AddToggle({Name = "瞄准NPC", Default = true, Callback = function(v) AimBot.TargetNPCs = v end})
-        
-        AimTab:AddTextbox({
-            Name = "骨骼优先级 (用逗号分隔)",
-            Default = table.concat(AimBot.BonePriority, ","),
-            Callback = function(txt)
-                local bones = {}
-                for bone in string.gmatch(txt, "[^,]+") do
-                    table.insert(bones, bone:match("^%s*(.-)%s*$"))
-                end
-                if #bones > 0 then AimBot.BonePriority = bones end
-            end
-        })
-        
-        AimTab:AddTextbox({
-            Name = "FOV半径",
-            Default = tostring(AimBot.FOV),
-            Callback = function(txt)
-                local num = tonumber(txt)
-                if num then AimBot.FOV = math.max(0, num) end
-            end
-        })
-        
-        AimTab:AddTextbox({
-            Name = "平滑度 (0.1-1)",
-            Default = tostring(AimBot.Smoothness),
-            Callback = function(txt)
-                local num = tonumber(txt)
-                if num then AimBot.Smoothness = math.clamp(num, 0.1, 1) end
-            end
-        })
-        
-        AimTab:AddTextbox({
-            Name = "命中率 (1-100)",
-            Default = tostring(AimBot.HitChance),
-            Callback = function(txt)
-                local num = tonumber(txt)
-                if num then AimBot.HitChance = math.clamp(num, 1, 100) end
-            end
-        })
-        
-        AimTab:AddTextbox({
-            Name = "预测值 (0-0.5)",
-            Default = tostring(AimBot.Prediction),
-            Callback = function(txt)
-                local num = tonumber(txt)
-                if num then AimBot.Prediction = math.clamp(num, 0, 0.5) end
-            end
-        })
-        
-        AimTab:AddTextbox({
-            Name = "射击延迟 (秒)",
-            Default = tostring(AimBot.ShotDelay),
-            Callback = function(txt)
-                local num = tonumber(txt)
-                if num then AimBot.ShotDelay = math.max(0.05, num) end
-            end
-        })
-        
-        -- 其他功能
-        local MiscTab = Window:MakeTab({Name = "其他功能", Icon = "rbxassetid://7733779610"})
-        
-        MiscTab:AddButton({
-            Name = "飞行模式",
-            Callback = function()
-                loadstring(game:HttpGet("https://raw.githubusercontent.com/XNEOFF/FlyGuiV3/main/FlyGuiV3.txt"))()
-            end
-        })
-        
-        MiscTab:AddButton({
-            Name = "穿墙模式",
-            Callback = function()
-                local Char = LocalPlayer.Character
-                if Char then
-                    for _, part in ipairs(Char:GetDescendants()) do
-                        if part:IsA("BasePart") then
-                            part.CanCollide = false
-                        end
-                    end
-                    OrionLib:MakeNotification({Name = "提示", Content = "穿墙模式已激活", Time = 3})
-                end
-            end
-        })
-        
-        -- 主循环
-        RunService.RenderStepped:Connect(function()
-            if AimBot.Enabled then
-                local target = AimBot:GetTarget()
-                if target then
-                    AimBot:AimAt(target)
-                end
-            end
-        end)
-        
-        OrionLib:Init()
-    end
-
-    -- 卡密验证窗口
-    local function ShowKeyWindow()
-        local KeyWindow = OrionLib:MakeWindow({
-            Name = "卡密验证",
-            HidePremium = true,
-            SaveConfig = false,
-            IntroEnabled = false
-        })
-        
-        local KeyTab = KeyWindow:MakeTab({Name = "验证", Icon = "rbxassetid://4370345174"})
-        
-        KeyTab:AddLabel("请输入卡密以使用脚本")
-        KeyTab:AddParagraph("提示", "卡密区分大小写，请确保输入正确")
-        
-        local KeyBox = KeyTab:AddTextbox({
-            Name = "输入卡密",
-            Default = "",
-            TextDisappear = false,
-            Callback = function(Value)
-                KeySystem.CurrentKey = Value
-            end
-        })
-        
-        KeyTab:AddButton({
-            Name = "验证卡密",
-            Callback = function()
-                if KeySystem.CurrentKey then
-                    local valid = false
-                    for _, key in ipairs(KeySystem.ValidKeys) do
-                        if KeySystem.CurrentKey == key then
-                            valid = true
-                            break
-                        end
-                    end
-                    
-                    if valid then
-                        KeySystem.IsVerified = true
-                        SaveKey(KeySystem.CurrentKey)
-                        KeyWindow:Destroy()
-                        ShowMainWindow()
-                    else
-                        OrionLib:MakeNotification({Name = "错误", Content = "卡密无效", Time = 3})
-                    end
-                end
-            end
-        })
-        
-        -- 自动填充已保存的卡密
-        local savedKey = LoadKey()
-        if savedKey then KeyBox:Set(savedKey) end
-    end
-
-    -- 启动脚本
-    local savedKey = LoadKey()
-    if savedKey then
-        for _, key in ipairs(KeySystem.ValidKeys) do
-            if savedKey == key then
-                KeySystem.CurrentKey = savedKey
-                KeySystem.IsVerified = true
-                task.wait(1)
-                ShowMainWindow()
-                return
-            end
+    end)
+    UIS.InputChanged:Connect(function(inp)
+        if inp.UserInputType == Enum.UserInputType.MouseMovement and drag then
+            local delta = inp.Position - start
+            obj.Position = UDim2.new(pos.X.Scale, pos.X.Offset + delta.X,
+                                     pos.Y.Scale, pos.Y.Offset + delta.Y)
         end
-    end
-    
-    ShowKeyWindow()
-end)()
+    end)
+end
+
+---------------------------------------------------
+-- 7) 初始化完毕
+---------------------------------------------------
+print("🥷 忍者注入器已就绪 | 双击顶部可最小化 | 按 RightShift 隐藏")
