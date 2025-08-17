@@ -1,1088 +1,458 @@
-(function()
-    -- 强制 200×200 居中窗口
-    getgenv().WindowSize = UDim2.new(0, 200, 0, 200)
-    
-    -- 随机化库名防止拦截
-    local randomLibName = "OrionLib_"..tostring(math.random(10000,99999))
-    _G[randomLibName] = loadstring(game:HttpGet("https://raw.githubusercontent.com/wsomoQaz/lua-/main/Xcccc"))()
-    local OrionLib = _G[randomLibName]
-    
-    -- 卡密系统配置
-    local KeySystem = {
-        CurrentKey = nil,
-        IsVerified = false,
-        KeyFile = "StitchKey_"..tostring(math.random(1,100))..".txt", -- 随机文件名
-        DiscordWebhook = "https://discord.com/api/webhooks/你的webhook地址",
-        ValidKeys = {
-            "2025",
-            "666",
-            "KUNKUN666",
-            "666free",
-            "TAIYOUYISILE"
-        },
-        StorageMethod = "Global" -- 默认使用全局变量存储
+-- Roblox ImGui 库 - 纯Lua实现
+-- 提供基本的UI组件和布局功能
+
+local ImGui = {}
+ImGui.__index = ImGui
+
+-- 初始化ImGui
+function ImGui.init()
+    local self = setmetatable({}, ImGui)
+    self.windows = {}
+    self.activeWindow = nil
+    self.mousePosition = Vector2.new(0, 0)
+    self.mouseDown = false
+    self.hotItem = nil
+    self.activeItem = nil
+    return self
+end
+
+-- 开始新窗口
+function ImGui:beginWindow(title, x, y, width, height)
+    local window = {
+        title = title,
+        position = Vector2.new(x, y),
+        size = Vector2.new(width, height),
+        items = {},
+        currentY = 40, -- 从标题栏下方开始
+        padding = 10,
+        itemSpacing = 5
     }
     
-    -- 检测执行器类型
-    local function identifyExecutor()
-        local exec = "Unknown"
-        if syn then exec = "Synapse" end
-        if KRNL_LOADED then exec = "Krnl" end
-        if fluxus then exec = "Fluxus" end
-        if is_sirhurt_closure then exec = "SirHurt" end
-        if identifyexecutor and identifyexecutor():lower():find("ninja") then
-            exec = "Ninja"
-            KeySystem.StorageMethod = "Global" -- 忍者注入器使用全局变量
-        end
-        return exec
-    end
+    table.insert(self.windows, window)
+    self.activeWindow = window
+    return window
+end
+
+-- 结束当前窗口
+function ImGui:endWindow()
+    self.activeWindow = nil
+end
+
+-- 绘制按钮
+function ImGui:button(label)
+    if not self.activeWindow then return false end
     
-    -- 纯黑主题
-    OrionLib.Themes.Default = {
-        Main    = Color3.fromRGB(20,20,20),
-        Second  = Color3.fromRGB(30,30,30),
-        Stroke  = Color3.fromRGB(50,50,50),
-        Divider = Color3.fromRGB(40,40,40),
-        Text    = Color3.fromRGB(255,255,255),
-        TextDark= Color3.fromRGB(200,200,200)
+    local window = self.activeWindow
+    local buttonWidth = 100
+    local buttonHeight = 30
+    
+    -- 计算按钮位置
+    local buttonX = window.position.X + window.padding
+    local buttonY = window.position.Y + window.currentY
+    
+    -- 创建按钮区域
+    local buttonRect = {
+        x = buttonX,
+        y = buttonY,
+        width = buttonWidth,
+        height = buttonHeight
     }
-    OrionLib.SelectedTheme = "Default"
     
-    -- 保存卡密
-    local function SaveKey(key)
-        if KeySystem.StorageMethod == "File" and writefile then
-            writefile(KeySystem.KeyFile, key)
+    -- 检查鼠标交互
+    local isHot = self:isPointInRect(self.mousePosition, buttonRect)
+    local isActive = false
+    local clicked = false
+    
+    if isHot then
+        self.hotItem = label
+        
+        if self.mouseDown then
+            self.activeItem = label
+        end
+        
+        if self.activeItem == label and not self.mouseDown then
+            clicked = true
+            self.activeItem = nil
+        end
+    end
+    
+    -- 绘制按钮
+    local buttonColor = Color3.fromRGB(80, 80, 80) -- 默认颜色
+    
+    if isHot then
+        buttonColor = Color3.fromRGB(100, 100, 100) -- 悬停颜色
+    end
+    
+    if self.activeItem == label then
+        buttonColor = Color3.fromRGB(120, 120, 120) -- 按下颜色
+    end
+    
+    -- 在Roblox中绘制按钮
+    local buttonFrame = Instance.new("Frame")
+    buttonFrame.Size = UDim2.new(0, buttonWidth, 0, buttonHeight)
+    buttonFrame.Position = UDim2.new(0, buttonX, 0, buttonY)
+    buttonFrame.BackgroundColor3 = buttonColor
+    buttonFrame.BorderSizePixel = 0
+    buttonFrame.Parent = game.Workspace
+    
+    local buttonLabel = Instance.new("TextLabel")
+    buttonLabel.Size = UDim2.new(1, 0, 1, 0)
+    buttonLabel.Text = label
+    buttonLabel.TextColor3 = Color3.new(1, 1, 1)
+    buttonLabel.BackgroundTransparency = 1
+    buttonLabel.Parent = buttonFrame
+    
+    -- 更新布局位置
+    window.currentY = window.currentY + buttonHeight + window.itemSpacing
+    
+    -- 存储按钮引用
+    table.insert(window.items, {
+        type = "button",
+        frame = buttonFrame,
+        label = buttonLabel,
+        rect = buttonRect,
+        clicked = clicked
+    })
+    
+    return clicked
+end
+
+-- 绘制复选框
+function ImGui:checkbox(label, checked)
+    if not self.activeWindow then return checked end
+    
+    local window = self.activeWindow
+    local checkboxSize = 20
+    local labelWidth = 100
+    local totalWidth = checkboxSize + 5 + labelWidth
+    
+    -- 计算位置
+    local x = window.position.X + window.padding
+    local y = window.position.Y + window.currentY
+    
+    -- 创建区域
+    local checkboxRect = {
+        x = x,
+        y = y,
+        width = checkboxSize,
+        height = checkboxSize
+    }
+    
+    -- 检查鼠标交互
+    local isHot = self:isPointInRect(self.mousePosition, checkboxRect)
+    local clicked = false
+    
+    if isHot then
+        self.hotItem = label
+        
+        if self.mouseDown then
+            self.activeItem = label
+        end
+        
+        if self.activeItem == label and not self.mouseDown then
+            clicked = true
+            self.activeItem = nil
+            checked = not checked
+        end
+    end
+    
+    -- 绘制复选框
+    local checkboxFrame = Instance.new("Frame")
+    checkboxFrame.Size = UDim2.new(0, checkboxSize, 0, checkboxSize)
+    checkboxFrame.Position = UDim2.new(0, x, 0, y)
+    checkboxFrame.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    checkboxFrame.BorderSizePixel = 1
+    checkboxFrame.BorderColor3 = Color3.new(0.5, 0.5, 0.5)
+    checkboxFrame.Parent = game.Workspace
+    
+    if checked then
+        local check = Instance.new("Frame")
+        check.Size = UDim2.new(0.6, 0, 0.6, 0)
+        check.Position = UDim2.new(0.2, 0, 0.2, 0)
+        check.BackgroundColor3 = Color3.new(1, 1, 1)
+        check.BorderSizePixel = 0
+        check.Parent = checkboxFrame
+    end
+    
+    -- 绘制标签
+    local labelText = Instance.new("TextLabel")
+    labelText.Size = UDim2.new(0, labelWidth, 0, checkboxSize)
+    labelText.Position = UDim2.new(0, x + checkboxSize + 5, 0, y)
+    labelText.Text = label
+    labelText.TextColor3 = Color3.new(1, 1, 1)
+    labelText.TextXAlignment = Enum.TextXAlignment.Left
+    labelText.BackgroundTransparency = 1
+    labelText.Parent = game.Workspace
+    
+    -- 更新布局位置
+    window.currentY = window.currentY + checkboxSize + window.itemSpacing
+    
+    -- 存储组件引用
+    table.insert(window.items, {
+        type = "checkbox",
+        frame = checkboxFrame,
+        label = labelText,
+        rect = checkboxRect,
+        checked = checked
+    })
+    
+    return checked
+end
+
+-- 绘制滑块
+function ImGui:slider(label, value, min, max)
+    if not self.activeWindow then return value end
+    
+    local window = self.activeWindow
+    local sliderWidth = 200
+    local sliderHeight = 20
+    local labelWidth = 100
+    
+    -- 计算位置
+    local x = window.position.X + window.padding
+    local y = window.position.Y + window.currentY
+    
+    -- 创建滑块区域
+    local sliderRect = {
+        x = x,
+        y = y,
+        width = sliderWidth,
+        height = sliderHeight
+    }
+    
+    -- 检查鼠标交互
+    local isHot = self:isPointInRect(self.mousePosition, sliderRect)
+    local isActive = false
+    
+    if isHot then
+        self.hotItem = label
+        
+        if self.mouseDown then
+            self.activeItem = label
+            isActive = true
+        end
+    end
+    
+    if self.activeItem == label then
+        if self.mouseDown then
+            isActive = true
         else
-            getgenv().StitchSavedKey = key
+            self.activeItem = nil
         end
     end
     
-    -- 读取卡密
-    local function LoadKey()
-        if KeySystem.StorageMethod == "File" and isfile and isfile(KeySystem.KeyFile) then
-            return readfile(KeySystem.KeyFile)
-        elseif getgenv().StitchSavedKey then
-            return getgenv().StitchSavedKey
-        end
-        return nil
+    -- 更新值
+    if isActive then
+        local normalized = (self.mousePosition.X - x) / sliderWidth
+        value = min + (max - min) * math.clamp(normalized, 0, 1)
     end
     
-    -- 验证卡密
-    local function VerifyKey(key)
-        if not key or key == "" then return false end
-        
-        for _, validKey in ipairs(KeySystem.ValidKeys) do
-            if key == validKey then
-                return true
-            end
-        end
-        
-        return false
-    end
+    -- 绘制滑块背景
+    local sliderBg = Instance.new("Frame")
+    sliderBg.Size = UDim2.new(0, sliderWidth, 0, sliderHeight)
+    sliderBg.Position = UDim2.new(0, x, 0, y)
+    sliderBg.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    sliderBg.BorderSizePixel = 0
+    sliderBg.Parent = game.Workspace
     
-    -- 复制到剪贴板
-    local function CopyToClipboard(text)
-        if setclipboard then
-            setclipboard(text)
-            return true
-        elseif writeclipboard then
-            writeclipboard(text)
-            return true
-        elseif toclipboard then
-            toclipboard(text)
-            return true
-        else
-            print("[复制内容] " .. text)
-            return false
-        end
-    end
+    -- 绘制滑块填充
+    local fillWidth = sliderWidth * ((value - min) / (max - min))
+    local sliderFill = Instance.new("Frame")
+    sliderFill.Size = UDim2.new(0, fillWidth, 0, sliderHeight)
+    sliderFill.Position = UDim2.new(0, x, 0, y)
+    sliderFill.BackgroundColor3 = Color3.fromRGB(100, 100, 200)
+    sliderFill.BorderSizePixel = 0
+    sliderFill.Parent = game.Workspace
     
-    -- 显示复制成功通知
-    local function ShowCopyNotification(success, content)
-        if success then
-            OrionLib:MakeNotification({
-                Name = "复制成功",
-                Content = "已复制到剪贴板: " .. content,
-                Time = 3
-            })
-        else
-            OrionLib:MakeNotification({
-                Name = "复制失败",
-                Content = "请手动复制控制台中的内容",
-                Time = 5
-            })
-        end
-    end
+    -- 绘制滑块手柄
+    local handleSize = 30
+    local handleX = x + fillWidth - handleSize/2
+    local handle = Instance.new("Frame")
+    handle.Size = UDim2.new(0, handleSize, 0, sliderHeight + 10)
+    handle.Position = UDim2.new(0, handleX, 0, y - 5)
+    handle.BackgroundColor3 = Color3.fromRGB(150, 150, 200)
+    handle.BorderSizePixel = 0
+    handle.Parent = game.Workspace
+    
+    -- 绘制标签
+    local labelText = Instance.new("TextLabel")
+    labelText.Size = UDim2.new(0, labelWidth, 0, sliderHeight)
+    labelText.Position = UDim2.new(0, x + sliderWidth + 10, 0, y)
+    labelText.Text = string.format("%s: %.2f", label, value)
+    labelText.TextColor3 = Color3.new(1, 1, 1)
+    labelText.TextXAlignment = Enum.TextXAlignment.Left
+    labelText.BackgroundTransparency = 1
+    labelText.Parent = game.Workspace
+    
+    -- 更新布局位置
+    window.currentY = window.currentY + sliderHeight + window.itemSpacing
+    
+    -- 存储组件引用
+    table.insert(window.items, {
+        type = "slider",
+        bg = sliderBg,
+        fill = sliderFill,
+        handle = handle,
+        label = labelText,
+        rect = sliderRect,
+        value = value,
+        min = min,
+        max = max
+    })
+    
+    return value
+end
 
-    -- 显示卡密验证窗口
-    local function ShowKeyWindow()
-        local windowName = "验证系统_"..tostring(math.random(1000,9999))
-        local KeyWindow = OrionLib:MakeWindow({
-            Name = windowName,
-            HidePremium = true,
-            SaveConfig = false,
-            IntroEnabled = false
-        })
+-- 绘制文本输入框
+function ImGui:inputText(label, text)
+    if not self.activeWindow then return text end
+    
+    local window = self.activeWindow
+    local inputWidth = 200
+    local inputHeight = 30
+    
+    -- 计算位置
+    local x = window.position.X + window.padding
+    local y = window.position.Y + window.currentY
+    
+    -- 创建输入框区域
+    local inputRect = {
+        x = x,
+        y = y,
+        width = inputWidth,
+        height = inputHeight
+    }
+    
+    -- 检查鼠标交互
+    local isHot = self:isPointInRect(self.mousePosition, inputRect)
+    local clicked = false
+    
+    if isHot then
+        self.hotItem = label
         
-        local KeyTab = KeyWindow:MakeTab({
-            Name = "验证",
-            Icon = "rbxassetid://4370345174"
-        })
-        
-        KeyTab:AddLabel("执行器: "..identifyExecutor())
-        KeyTab:AddLabel("请输入您的卡密以继续使用脚本")
-        KeyTab:AddParagraph("注意", "卡密区分大小写，请确保输入正确")
-        
-        local KeyBox = KeyTab:AddTextbox({
-            Name = "输入卡密",
-            Default = "",
-            TextDisappear = false,
-            Callback = function(Value)
-                KeySystem.CurrentKey = Value
-            end
-        })
-        
-        KeyTab:AddButton({
-            Name = "验证卡密",
-            Callback = function()
-                if KeySystem.CurrentKey and VerifyKey(KeySystem.CurrentKey) then
-                    KeySystem.IsVerified = true
-                    SaveKey(KeySystem.CurrentKey)
-                    
-                    OrionLib:MakeNotification({
-                        Name = "验证成功",
-                        Content = "卡密验证通过，欢迎使用脚本！",
-                        Time = 3
-                    })
-                    
-                    KeyWindow:Destroy()
-                    
-                    -- 创建坤坤大帝脚本动画
-                    CreateKunKunAnimation()
-                    
-                    -- 延迟后显示主窗口
-                    task.wait(2.5)
-                    ShowMainWindow()
-                else
-                    OrionLib:MakeNotification({
-                        Name = "验证失败",
-                        Content = "卡密无效或已过期，请重试！",
-                        Time = 3
-                    })
-                end
-            end
-        })
-        
-        KeyTab:AddButton({
-            Name = "获取卡密",
-            Callback = function()
-                OrionLib:MakeNotification({
-                    Name = "获取卡密",
-                    Content = "请加入Discord: https://discord.gg/xVUf7H9M",
-                    Time = 5
-                })
-            end
-        })
-        
-        -- 添加一键复制按钮
-        KeyTab:AddButton({
-            Name = "一键复制当前卡密",
-            Callback = function()
-                if KeySystem.CurrentKey and KeySystem.CurrentKey ~= "" then
-                    local success = CopyToClipboard(KeySystem.CurrentKey)
-                    ShowCopyNotification(success, KeySystem.CurrentKey)
-                else
-                    OrionLib:MakeNotification({
-                        Name = "复制失败",
-                        Content = "当前没有卡密可复制",
-                        Time = 3
-                    })
-                end
-            end
-        })
-        
-        KeyTab:AddButton({
-            Name = "一键复制Discord链接",
-            Callback = function()
-                local discordLink = "https://discord.gg/xVUf7H9M"
-                local success = CopyToClipboard(discordLink)
-                ShowCopyNotification(success, discordLink)
-            end
-        })
-        
-        -- 自动填充已保存的卡密
-        local savedKey = LoadKey()
-        if savedKey then
-            KeyBox:Set(savedKey)
-            KeySystem.CurrentKey = savedKey
+        if self.mouseDown then
+            clicked = true
+            self.activeItem = label
         end
     end
     
-    -- 坤坤大帝脚本弹性动画
-    local function CreateKunKunAnimation()
-        -- 创建全屏背景
-        local bg = Drawing.new("Square")
-        bg.Size = workspace.CurrentCamera.ViewportSize
-        bg.Position = Vector2.new(0, 0)
-        bg.Color = Color3.new(0, 0, 0)
-        bg.Filled = true
-        bg.Transparency = 1
-        bg.Visible = true
-        bg.ZIndex = 999
-        
-        -- 创建坤坤大帝文字
-        local text = Drawing.new("Text")
-        text.Text = "坤坤大帝脚本"
-        text.Size = 100
-        text.Center = true
-        text.Position = Vector2.new(workspace.CurrentCamera.ViewportSize.X/2, -200)
-        text.Color = Color3.new(1, 0.2, 0.2)
-        text.Outline = true
-        text.OutlineColor = Color3.new(1, 1, 1)
-        text.Transparency = 0
-        text.Visible = true
-        text.ZIndex = 1000
-        
-        -- 创建副标题
-        local subText = Drawing.new("Text")
-        subText.Text = "尊享特权版 - 启动成功"
-        subText.Size = 40
-        subText.Center = true
-        subText.Position = Vector2.new(workspace.CurrentCamera.ViewportSize.X/2, -100)
-        subText.Color = Color3.new(0.8, 0.8, 1)
-        subText.Outline = true
-        subText.OutlineColor = Color3.new(0.2, 0.2, 0.2)
-        subText.Transparency = 0
-        subText.Visible = true
-        subText.ZIndex = 1000
-        
-        -- 弹性动画函数
-        local function elasticAnimation(obj, targetY, duration)
-            local startY = obj.Position.Y
-            local startTime = tick()
-            local damping = 0.7
-            local stiffness = 0.3
-            
-            local connection
-            connection = game:GetService("RunService").RenderStepped:Connect(function()
-                local elapsed = tick() - startTime
-                local progress = elapsed / duration
-                
-                if progress >= 1 then
-                    obj.Position = Vector2.new(obj.Position.X, targetY)
-                    connection:Disconnect()
-                    return
-                end
-                
-                local overshoot = math.sin(progress * math.pi * 4) * (1 - progress)
-                local newY = targetY + (startY - targetY) * math.pow(1 - progress, 2) * overshoot * stiffness
-                stiffness = stiffness * damping
-                
-                obj.Position = Vector2.new(obj.Position.X, newY)
-            end)
-        end
-        
-        task.spawn(function()
-            -- 背景淡入
-            for i = 0, 1, 0.05 do
-                bg.Transparency = 1 - i * 0.7
-                task.wait(0.01)
-            end
-            
-            -- 主标题弹性下落
-            elasticAnimation(text, workspace.CurrentCamera.ViewportSize.Y/2 - 100, 1.5)
-            
-            -- 副标题延迟后弹性下落
-            task.wait(0.2)
-            elasticAnimation(subText, workspace.CurrentCamera.ViewportSize.Y/2 + 20, 1.3)
-            
-            -- 总停留时间5秒
-            task.wait(3.5)
-            
-            -- 淡出动画
-            for i = 0, 1, 0.05 do
-                text.Transparency = i
-                subText.Transparency = i
-                bg.Transparency = 0.3 + i * 0.7
-                task.wait(0.01)
-            end
-            
-            -- 移除绘图对象
-            bg:Remove()
-            text:Remove()
-            subText:Remove()
-        end)
-    end
+    -- 绘制输入框背景
+    local inputBg = Instance.new("Frame")
+    inputBg.Size = UDim2.new(0, inputWidth, 0, inputHeight)
+    inputBg.Position = UDim2.new(0, x, 0, y)
+    inputBg.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    inputBg.BorderSizePixel = 0
+    inputBg.Parent = game.Workspace
+    
+    -- 绘制文本
+    local inputText = Instance.new("TextLabel")
+    inputText.Size = UDim2.new(1, -10, 1, 0)
+    inputText.Position = UDim2.new(0, 5, 0, 0)
+    inputText.Text = text
+    inputText.TextColor3 = Color3.new(1, 1, 1)
+    inputText.TextXAlignment = Enum.TextXAlignment.Left
+    inputText.BackgroundTransparency = 1
+    inputText.Parent = inputBg
+    
+    -- 绘制标签
+    local labelText = Instance.new("TextLabel")
+    labelText.Size = UDim2.new(0, 100, 0, inputHeight)
+    labelText.Position = UDim2.new(0, x + inputWidth + 10, 0, y)
+    labelText.Text = label
+    labelText.TextColor3 = Color3.new(1, 1, 1)
+    labelText.TextXAlignment = Enum.TextXAlignment.Left
+    labelText.BackgroundTransparency = 1
+    labelText.Parent = game.Workspace
+    
+    -- 更新布局位置
+    window.currentY = window.currentY + inputHeight + window.itemSpacing
+    
+    -- 存储组件引用
+    table.insert(window.items, {
+        type = "input",
+        bg = inputBg,
+        text = inputText,
+        label = labelText,
+        rect = inputRect,
+        value = text
+    })
+    
+    return text
+end
 
-    -- 显示主窗口（验证通过后）
-    local function ShowMainWindow()
-        -- 随机化窗口名防止拦截
-        local windowName = "坤坤脚本_"..tostring(math.random(1000,9999))
-        
-        -- 主窗口
-        local Window = OrionLib:MakeWindow({
-            IntroText = "坤坤大帝脚本",
-            Name = windowName,
-            HidePremium = false,
-            SaveConfig = true,
-            ConfigFolder = "StitchConfig_"..tostring(math.random(1,100)) -- 随机配置文件夹名
-        })
-        
-        -- 公告 Tab
-        local Tab1 = Window:MakeTab({Name = "公告", Icon = "rbxassetid://7733779610"})
-        local function getDate() return os.date("%Y-%m-%d %H:%M") end
-        local function getPlayer()
-            local p = game.Players.LocalPlayer
-            return {
-                ["用户名"]   = p.Name,
-                ["显示名"]   = p.DisplayName,
-                ["用户ID"]   = p.UserId,
-                ["注册天数"] = p.AccountAge,
-                ["当前游戏"] = game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId).Name
-            }
-        end
-        Tab1:AddLabel("📅 当前时间")
-        Tab1:AddLabel(getDate())
-        for k, v in pairs(getPlayer()) do
-            Tab1:AddLabel(k .. "： " .. tostring(v))
-        end
-        
-        Tab1:AddButton({
-            Name = "一键复制QQ号", 
-            Callback = function() 
-                local success = CopyToClipboard("913348285")
-                ShowCopyNotification(success, "913348285")
-            end
-        })
-        
-        -- 人物功能 Tab
-        local Tab4 = Window:MakeTab({Name = "人物功能", Icon = "rbxassetid://7733779610"})
-        
-        -- 鼠标模拟函数 (兼容忍者注入器)
-        local mouse1press, mouse1release
-        if mousemoverel then
-            mouse1press = function()
-                local vim = game:GetService("VirtualInputManager")
-                vim:SendMouseButtonEvent(0,0,0,true,game,1)
-            end
-            mouse1release = function()
-                local vim = game:GetService("VirtualInputManager")
-                vim:SendMouseButtonEvent(0,0,0,false,game,1)
-            end
-        else
-            mouse1press = mouse1press or function() end
-            mouse1release = mouse1release or function() end
-        end
-        
-        -----------------------------------------------------------------
-        -- 亚洲最强Aimbot系统 - 修复静止目标问题
-        -----------------------------------------------------------------
-        -- 通用参数
-        local aimbotEnabled      = false
-        local aimbotSmooth       = 0.35
-        local aimbotBone         = "Head"
-        local aimbotPrediction   = 0.12
-        local aimbotDelay        = 0.08
-        local aimbotCheckTeam    = false  -- 默认关闭
-        local aimbotWallCheck    = true   -- 墙体检测默认开启
-        local lastFire = 0
-        local aimbotConn
-        local maxAimbotDistance  = 1000   -- 最大瞄准距离
-        local aimbotFOVMode      = "跟随鼠标" -- 默认模式
-        local aimbotTargetMode   = "准心瞄准" -- 默认模式
-        local aimbotShowLine     = false   -- 自瞄线条默认关闭
-        local aimbotLine = Drawing.new("Line")
-        aimbotLine.Visible = false
-        aimbotLine.Thickness = 1.5
-        aimbotLine.Color = Color3.fromRGB(255, 0, 0)
-        
-        -- 缺失变量一次性补全
-        local Camera = workspace.CurrentCamera
-        local UserInputService = game:GetService("UserInputService")
-        local Players = game:GetService("Players")
-        local LocalPlayer = Players.LocalPlayer
-        
-        -- 1. 跟随鼠标 FOV
-        local mouseFOV      = 120
-        local mouseFovCircle = Drawing.new("Circle")
-        mouseFovCircle.NumSides  = 64
-        mouseFovCircle.Radius    = mouseFOV
-        mouseFovCircle.Thickness = 1.5
-        mouseFovCircle.Color     = Color3.fromRGB(255,255,255)
-        mouseFovCircle.Filled    = false
-        mouseFovCircle.Visible   = false  -- 默认关闭
-        mouseFovCircle.ZIndex = 10
-        
-        -- 2. 固定中心 FOV
-        local fixedFOV      = 90
-        local fixedFovCircle = Drawing.new("Circle")
-        fixedFovCircle.NumSides  = 64
-        fixedFovCircle.Radius    = fixedFOV
-        fixedFovCircle.Thickness = 1.5
-        fixedFovCircle.Color     = Color3.fromRGB(255,165,0)
-        fixedFovCircle.Filled    = false
-        fixedFovCircle.Visible   = false  -- 默认关闭
-        fixedFovCircle.ZIndex = 9
-        
-        -- 固定圆中心一次设置
-        local function setFixedCenter()
-            local center = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
-            fixedFovCircle.Position = center
-        end
-        if Camera:GetPropertyChangedSignal then
-            Camera:GetPropertyChangedSignal("ViewportSize"):Connect(setFixedCenter)
-        end
-        setFixedCenter()
-        
-        -- 工具函数
-        local function getAimPos(character)
-            if not character then return nil end
-            local root = character:FindFirstChild("HumanoidRootPart")
-            local bone = character:FindFirstChild(aimbotBone) or character:FindFirstChild("Head")
-            if not (root and bone) then return nil end
-            
-            -- 修复静止目标问题：即使速度为0也使用当前位置
-            local vel = root.Velocity
-            if vel.Magnitude < 1 then
-                vel = Vector3.new(0,0,0)
-            end
-            
-            return bone.Position + vel * aimbotPrediction
-        end
-        
-        -- 高效可见性检测
-        local function isVisible(pos)
-            if not aimbotWallCheck then return true end
-            local origin = Camera.CFrame.Position
-            local direction = (pos - origin).Unit
-            local ray = Ray.new(origin, direction * (origin - pos).Magnitude)
-            local part, position = workspace:FindPartOnRay(ray, LocalPlayer.Character)
-            return part == nil
-        end
-        
-        -- 获取最近目标 (亚洲最强目标选择算法)
-        local function getClosest()
-            local closestPlayer = nil
-            local shortestDistance = math.huge
-            local mousePos = UserInputService:GetMouseLocation()
-            local center = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
-            
-            for _, player in ipairs(Players:GetPlayers()) do
-                if player ~= LocalPlayer and player.Character then
-                    -- 队伍检查
-                    if aimbotCheckTeam and player.Team == LocalPlayer.Team then
-                        continue
-                    end
-                    
-                    local aimPos = getAimPos(player.Character)
-                    if not aimPos then continue end
-                    
-                    -- 距离检查
-                    local distance3D = (LocalPlayer.Character.HumanoidRootPart.Position - aimPos).Magnitude
-                    if distance3D > maxAimbotDistance then continue end
-                    
-                    -- 转换为屏幕坐标
-                    local screenPos, onScreen = Camera:WorldToScreenPoint(aimPos)
-                    if not onScreen then continue end
-                    
-                    -- 检查是否在FOV内
-                    local screenPoint = Vector2.new(screenPos.X, screenPos.Y)
-                    local distanceToCenter = (screenPoint - center).Magnitude
-                    local distanceToMouse = (screenPoint - mousePos).Magnitude
-                    
-                    local inFOV = false
-                    if aimbotFOVMode == "固定中心" then
-                        inFOV = distanceToCenter <= fixedFOV
-                    else
-                        inFOV = distanceToMouse <= mouseFOV
-                    end
-                    
-                    if not inFOV then continue end
-                    
-                    -- 可见性检查
-                    if not isVisible(aimPos) then continue end
-                    
-                    -- 根据模式选择目标
-                    local targetDistance = 0
-                    if aimbotTargetMode == "距离瞄准" then
-                        targetDistance = distance3D
-                    else
-                        targetDistance = distanceToCenter
-                    end
-                    
-                    -- 更新最近目标
-                    if targetDistance < shortestDistance then
-                        shortestDistance = targetDistance
-                        closestPlayer = player
-                    end
-                end
-            end
-            
-            return closestPlayer
-        end
-        
-        -- 主循环（亚洲最强平滑算法）
-        local function startAimbot()
-            if aimbotConn then return end
-            
-            aimbotConn = game:GetService("RunService").RenderStepped:Connect(function()
-                if not aimbotEnabled then return end
-                
-                -- 更新FOV显示
-                if aimbotFOVMode == "固定中心" then
-                    fixedFovCircle.Visible = true
-                    mouseFovCircle.Visible = false
-                else
-                    fixedFovCircle.Visible = false
-                    mouseFovCircle.Visible = true
-                    mouseFovCircle.Position = UserInputService:GetMouseLocation()
-                end
-        
-                local target = getClosest()
-                if not target or not target.Character then 
-                    aimbotLine.Visible = false
-                    return 
-                end
-                
-                local aimPos = getAimPos(target.Character)
-                if not aimPos then 
-                    aimbotLine.Visible = false
-                    return 
-                end
-                
-                -- 更新自瞄线条
-                if aimbotShowLine then
-                    local screenPos = Camera:WorldToScreenPoint(aimPos)
-                    if screenPos.Z > 0 then
-                        local center = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
-                        aimbotLine.From = center
-                        aimbotLine.To = Vector2.new(screenPos.X, screenPos.Y)
-                        aimbotLine.Visible = true
-                    else
-                        aimbotLine.Visible = false
-                    end
-                else
-                    aimbotLine.Visible = false
-                end
-        
-                -- 安全 + 角度限制
-                local delta = aimPos - Camera.CFrame.Position
-                if delta.Magnitude < 0.1 then return end
-                
-                local targetCF = CFrame.new(Camera.CFrame.Position, Camera.CFrame.Position + delta)
-                local currentLook = Camera.CFrame.LookVector
-                local targetLook = targetCF.LookVector
-                
-                local dot = currentLook:Dot(targetLook)
-                local angle = math.acos(math.clamp(dot, -1, 1))
-                local maxAngle = math.rad(90)
-                
-                if angle <= maxAngle then
-                    -- 亚洲最强平滑算法：指数平滑
-                    local smoothFactor = math.clamp(aimbotSmooth, 0.01, 0.99)
-                    local t = 1 - math.exp(-30 * smoothFactor * task.wait())
-                    local newLook = currentLook:Lerp(targetLook, t)
-                    Camera.CFrame = CFrame.new(Camera.CFrame.Position, Camera.CFrame.Position + newLook)
-                end
-        
-                -- 自动开火
-                if tick() - lastFire > aimbotDelay then
-                    mouse1press()
-                    task.wait(0.05)
-                    mouse1release()
-                    lastFire = tick()
-                end
-            end)
-        end
-        
-        local function stopAimbot()
-            if aimbotConn then 
-                aimbotConn:Disconnect() 
-                aimbotConn = nil 
-            end
-            mouseFovCircle.Visible = false
-            fixedFovCircle.Visible = false
-            aimbotLine.Visible = false
-        end
-        
-        -- UI 构建
-        local aimbotSec = Tab4:AddSection({Name = "AI-Aimbot (亚洲最强版)"})
-        aimbotSec:AddToggle({
-            Name = "启用 Aimbot",
-            Default = false,
-            Callback = function(v)
-                aimbotEnabled = v
-                if v then 
-                    startAimbot() 
-                else 
-                    stopAimbot() 
-                end
-            end
-        })
-        aimbotSec:AddToggle({
-            Name = "仅瞄准敌人",
-            Default = aimbotCheckTeam,  -- 默认关闭
-            Callback = function(v) aimbotCheckTeam = v end
-        })
-        aimbotSec:AddToggle({
-            Name = "墙体检测",
-            Default = aimbotWallCheck,  -- 默认开启
-            Callback = function(v) aimbotWallCheck = v end
-        })
-        aimbotSec:AddToggle({
-            Name = "显示自瞄线条",
-            Default = aimbotShowLine,  -- 默认关闭
-            Callback = function(v) aimbotShowLine = v end
-        })
-        
-        aimbotSec:AddDropdown({
-            Name = "FOV模式",
-            Default = "跟随鼠标",
-            Options = {"跟随鼠标", "固定中心"},
-            Callback = function(v)
-                aimbotFOVMode = v
-                if aimbotEnabled then
-                    stopAimbot()
-                    task.wait()
-                    startAimbot()
-                end
-            end
-        })
-        
-        aimbotSec:AddDropdown({
-            Name = "瞄准模式",
-            Default = "准心瞄准",
-            Options = {"准心瞄准", "距离瞄准"},
-            Callback = function(v)
-                aimbotTargetMode = v
-            end
-        })
-        
-        local mouseSec = Tab4:AddSection({Name = "跟随鼠标 FOV"})
-        local mouseTog = mouseSec:AddToggle({ Name = "显示跟随FOV", Default = false, Callback = function(v) mouseFovCircle.Visible = v end })
-        local mouseSlider = mouseSec:AddSlider({ Name = "半径（滑条）", Min = 0, Max = 500, Default = mouseFOV, Increment = 5, Callback = function(v) mouseFOV = v; mouseFovCircle.Radius = v end })
-        mouseSec:AddTextbox({ Name = "半径（输入）", Default = tostring(mouseFOV), Callback = function(txt) local n = tonumber(txt) if n then mouseFOV = n; mouseFovCircle.Radius = n; mouseSlider:Set(n) end end })
-        
-        local fixedSec = Tab4:AddSection({Name = "固定中心 FOV"})
-        local fixedTog = fixedSec:AddToggle({ Name = "显示固定FOV", Default = false, Callback = function(v) fixedFovCircle.Visible = v end })
-        local fixedSlider = fixedSec:AddSlider({ Name = "半径（滑条）", Min = 0, Max = 500, Default = fixedFOV, Increment = 5, Callback = function(v) fixedFOV = v; fixedFovCircle.Radius = v end })
-        fixedSec:AddTextbox({ Name = "半径（输入）", Default = tostring(fixedFOV), Callback = function(txt) local n = tonumber(txt) if n then fixedFOV = n; fixedFovCircle.Radius = n; fixedSlider:Set(n) end end })
-        
-        local commonSec = Tab4:AddSection({Name = "高级参数"})
-        local smoothSlider = commonSec:AddSlider({ Name = "平滑系数（滑条）", Min = 0, Max = 1, Default = aimbotSmooth, Increment = 0.01, Callback = function(v) aimbotSmooth = v end })
-        commonSec:AddTextbox({ Name = "平滑系数（输入）", Default = tostring(aimbotSmooth), Callback = function(txt) local n = tonumber(txt) if n then aimbotSmooth = n; smoothSlider:Set(n) end end })
-        local predSlider = commonSec:AddSlider({ Name = "预测 (秒)（滑条）", Min = 0, Max = 1, Default = aimbotPrediction, Increment = 0.01, Callback = function(v) aimbotPrediction = v end })
-        commonSec:AddTextbox({ Name = "预测 (秒)（输入）", Default = tostring(aimbotPrediction), Callback = function(txt) local n = tonumber(txt) if n then aimbotPrediction = n; predSlider:Set(n) end end })
-        local delaySlider = commonSec:AddSlider({ Name = "开火延迟 (秒)（滑条）", Min = 0, Max = 1, Default = aimbotDelay, Increment = 0.01, Callback = function(v) aimbotDelay = v end })
-        commonSec:AddTextbox({ Name = "开火延迟 (秒)（输入）", Default = tostring(aimbotDelay), Callback = function(txt) local n = tonumber(txt) if n then aimbotDelay = n; delaySlider:Set(n) end end })
-        local maxDistSlider = commonSec:AddSlider({ Name = "最大距离（滑条）", Min = 0, Max = 5000, Default = maxAimbotDistance, Increment = 50, Callback = function(v) maxAimbotDistance = v end })
-        commonSec:AddTextbox({ Name = "最大距离（输入）", Default = tostring(maxAimbotDistance), Callback = function(txt) local n = tonumber(txt) if n then maxAimbotDistance = n; maxDistSlider:Set(n) end end })
-        commonSec:AddDropdown({ Name = "瞄准骨骼", Default = aimbotBone, Options = {"Head","Neck","UpperTorso","HumanoidRootPart"}, Callback = function(v) aimbotBone = v end })
-        
-        -- 添加一键测试按钮
-        commonSec:AddButton({
-            Name = "测试Aimbot",
-            Callback = function()
-                local originalState = aimbotEnabled
-                aimbotEnabled = true
-                OrionLib:MakeNotification({
-                    Name = "测试中",
-                    Content = "Aimbot已临时启用5秒",
-                    Time = 5
-                })
-                task.wait(5)
-                aimbotEnabled = originalState
-                if not originalState then
-                    stopAimbot()
-                end
-            end
-        })
+-- 绘制标签
+function ImGui:label(text)
+    if not self.activeWindow then return end
+    
+    local window = self.activeWindow
+    local labelWidth = 300
+    local labelHeight = 30
+    
+    -- 计算位置
+    local x = window.position.X + window.padding
+    local y = window.position.Y + window.currentY
+    
+    -- 绘制标签
+    local labelText = Instance.new("TextLabel")
+    labelText.Size = UDim2.new(0, labelWidth, 0, labelHeight)
+    labelText.Position = UDim2.new(0, x, 0, y)
+    labelText.Text = text
+    labelText.TextColor3 = Color3.new(1, 1, 1)
+    labelText.TextXAlignment = Enum.TextXAlignment.Left
+    labelText.BackgroundTransparency = 1
+    labelText.Parent = game.Workspace
+    
+    -- 更新布局位置
+    window.currentY = window.currentY + labelHeight + window.itemSpacing
+    
+    -- 存储组件引用
+    table.insert(window.items, {
+        type = "label",
+        text = labelText
+    })
+end
 
-        -----------------------------------------------------------------
-        -- 删除阴影（全局开关）
-        -----------------------------------------------------------------
-        Tab4:AddToggle({
-            Name = "删除阴影",
-            Default = false,
-            Callback = function(v)
-                if game.Lighting then
-                    game.Lighting.GlobalShadows = not v
-                end
-                for _, l in ipairs(workspace:GetDescendants()) do
-                    if l:IsA("BasePart") or l:IsA("MeshPart") then
-                        l.CastShadow = not v
-                    end
-                end
-                OrionLib:MakeNotification({Name = "提示", Content = v and "阴影已删除" or "阴影已恢复", Time = 2})
-            end
-        })
+-- 检查点是否在矩形内
+function ImGui:isPointInRect(point, rect)
+    return point.X >= rect.x and point.X <= rect.x + rect.width and
+           point.Y >= rect.y and point.Y <= rect.y + rect.height
+end
 
-        -----------------------------------------------------------------
-        -- 增强版玩家 ESP（含线条选项）
-        -----------------------------------------------------------------
-        local espEnabled = false
-        local espCache = {}
-        local espLineType = "顶端" -- 默认线条在顶端
-        
-        -- 获取队伍颜色
-        local function getTeamColor(plr)
-            if plr.Team and LocalPlayer.Team and plr.Team == LocalPlayer.Team then
-                return Color3.fromRGB(0, 255, 0) -- 队友绿色
-            else
-                return Color3.fromRGB(255, 0, 0) -- 敌人红色
-            end
-        end
-        
-        -- 创建ESP对象
-        local function createESPObject(plr)
-            local esp = {
-                Box = Drawing.new("Quad"),
-                Name = Drawing.new("Text"),
-                Distance = Drawing.new("Text"),
-                HealthBar = Drawing.new("Quad"),
-                HealthText = Drawing.new("Text"),
-                TopLine = Drawing.new("Line"),
-                BottomLine = Drawing.new("Line")
-            }
-            
-            -- 设置初始属性
-            esp.Box.Thickness = 1.5
-            esp.Box.Filled = false
-            esp.Box.ZIndex = 5
-            
-            esp.Name.Size = 18
-            esp.Name.Center = true
-            esp.Name.Outline = true
-            esp.Name.ZIndex = 6
-            
-            esp.Distance.Size = 16
-            esp.Distance.Center = true
-            esp.Distance.Outline = true
-            esp.Distance.ZIndex = 6
-            
-            esp.HealthBar.Filled = true
-            esp.HealthBar.Thickness = 1
-            esp.HealthBar.ZIndex = 5
-            
-            esp.HealthText.Size = 14
-            esp.HealthText.Center = true
-            esp.HealthText.Outline = true
-            esp.HealthText.ZIndex = 6
-            
-            esp.TopLine.Thickness = 1
-            esp.TopLine.ZIndex = 4
-            
-            esp.BottomLine.Thickness = 1
-            esp.BottomLine.ZIndex = 4
-            
-            espCache[plr] = esp
-            return esp
-        end
-        
-        -- 更新ESP
-        local function updateESP()
-            if not espEnabled then return end
-            
-            for _, plr in ipairs(Players:GetPlayers()) do
-                if plr == LocalPlayer then continue end
-                
-                local char = plr.Character
-                if not char then
-                    if espCache[plr] then
-                        for _, obj in pairs(espCache[plr]) do
-                            obj.Visible = false
-                        end
-                    end
-                    continue 
-                end
-                
-                local root = char:FindFirstChild("HumanoidRootPart")
-                local head = char:FindFirstChild("Head")
-                local humanoid = char:FindFirstChildOfClass("Humanoid")
-                
-                if not (root and head and humanoid) then continue end
-                
-                -- 获取屏幕位置
-                local rootPos, rootVis = Camera:WorldToViewportPoint(root.Position)
-                local headPos, headVis = Camera:WorldToViewportPoint(head.Position + Vector3.new(0, 1.5, 0))
-                
-                if not (rootVis and headVis) then
-                    if espCache[plr] then
-                        for _, obj in pairs(espCache[plr]) do
-                            obj.Visible = false
-                        end
-                    end
-                    continue
-                end
-                
-                -- 创建或获取ESP对象
-                local esp = espCache[plr] or createESPObject(plr)
-                
-                -- 计算尺寸
-                local height = math.abs(headPos.Y - rootPos.Y) * 1.5
-                local width = height * 0.6
-                local left = headPos.X - width / 2
-                local right = headPos.X + width / 2
-                local top = headPos.Y
-                local bottom = headPos.Y + height
-                
-                -- 设置颜色
-                local color = getTeamColor(plr)
-                
-                -- 更新方框
-                esp.Box.Visible = true
-                esp.Box.Color = color
-                esp.Box.PointA = Vector2.new(left, top)
-                esp.Box.PointB = Vector2.new(right, top)
-                esp.Box.PointC = Vector2.new(right, bottom)
-                esp.Box.PointD = Vector2.new(left, bottom)
-                
-                -- 更新名字
-                esp.Name.Visible = true
-                esp.Name.Color = color
-                esp.Name.Position = Vector2.new(headPos.X, top - 20)
-                esp.Name.Text = plr.Name
-                
-                -- 更新距离
-                local distance = math.floor((root.Position - Camera.CFrame.Position).Magnitude)
-                esp.Distance.Visible = true
-                esp.Distance.Color = color
-                esp.Distance.Position = Vector2.new(headPos.X, bottom + 5)
-                esp.Distance.Text = tostring(distance) .. "m"
-                
-                -- 更新血条
-                local healthPercent = math.clamp(humanoid.Health / humanoid.MaxHealth, 0, 1)
-                local barWidth = width
-                local barHeight = 5
-                local barX = left
-                local barY = bottom + 20
-                
-                esp.HealthBar.Visible = true
-                esp.HealthBar.Color = Color3.new(1 - healthPercent, healthPercent, 0)
-                esp.HealthBar.PointA = Vector2.new(barX, barY)
-                esp.HealthBar.PointB = Vector2.new(barX + barWidth * healthPercent, barY)
-                esp.HealthBar.PointC = Vector2.new(barX + barWidth * healthPercent, barY + barHeight)
-                esp.HealthBar.PointD = Vector2.new(barX, barY + barHeight)
-                
-                -- 更新血量文本
-                esp.HealthText.Visible = true
-                esp.HealthText.Color = Color3.new(1, 1, 1)
-                esp.HealthText.Position = Vector2.new(barX + barWidth / 2, barY - 10)
-                esp.HealthText.Text = math.floor(humanoid.Health) .. "/" .. math.floor(humanoid.MaxHealth)
-                
-                -- 更新线条
-                esp.TopLine.Visible = espLineType == "顶端" or espLineType == "两者"
-                esp.BottomLine.Visible = espLineType == "底端" or espLineType == "两者"
-                
-                if esp.TopLine.Visible then
-                    esp.TopLine.Color = color
-                    esp.TopLine.From = Vector2.new(headPos.X, top)
-                    esp.TopLine.To = Vector2.new(headPos.X, 0)
-                end
-                
-                if esp.BottomLine.Visible then
-                    esp.BottomLine.Color = color
-                    esp.BottomLine.From = Vector2.new(headPos.X, bottom)
-                    esp.BottomLine.To = Vector2.new(headPos.X, Camera.ViewportSize.Y)
-                end
-            end
-            
-            -- 清理不存在的玩家ESP
-            for plr, esp in pairs(espCache) do
-                if not plr or not plr.Parent or plr == LocalPlayer then
-                    for _, obj in pairs(esp) do
-                        obj.Visible = false
-                        obj:Remove()
-                    end
-                    espCache[plr] = nil
-                end
-            end
-        end
-        
-        -- 启动ESP循环
-        local espLoop
-        local espSection = Tab4:AddSection({Name = "增强玩家 ESP"})
-        espSection:AddToggle({
-            Name = "启用玩家 ESP", 
-            Default = false, 
-            Callback = function(v)
-                espEnabled = v
-                if v then
-                    if not espLoop then
-                        espLoop = game:GetService("RunService").RenderStepped:Connect(updateESP)
-                    end
-                else
-                    if espLoop then
-                        espLoop:Disconnect()
-                        espLoop = nil
-                    end
-                    -- 清理缓存
-                    for plr, esp in pairs(espCache) do
-                        for _, obj in pairs(esp) do
-                            pcall(function() obj:Remove() end)
-                        end
-                    end
-                    table.clear(espCache)
-                end
-            end
-        })
-        
-        espSection:AddDropdown({
-            Name = "线条位置",
-            Default = "顶端",
-            Options = {"顶端", "底端", "两者"},
-            Callback = function(v)
-                espLineType = v
-            end
-        })
-
-        -- 脚本中心
-        local Tab2 = Window:MakeTab({Name = "VR", Icon = "rbxassetid://7733779610"})
-        Tab2:AddButton({Name = "FEVR脚本", Callback = function()
-            loadstring(game:HttpGet("https://raw.githubusercontent.com/randomstring0/Qwerty/refs/heads/main/qwerty45.lua"))()
-        end})
-        
-        local Tab3 = Window:MakeTab({Name = "XA脚本", Icon = "rbxassetid://7733779610"})
-        Tab3:AddButton({Name = "XA HUB", Callback = function()
-            loadstring(game:HttpGet("https://xingtaiduan.pythonanywhere.com/Loader"))()
-        end})
-        
-        local Tab5 = Window:MakeTab({Name = "RB脚本", Icon = "rbxassetid://7733779610"})
-        Tab5:AddButton({Name = "Rb脚本", Callback = function()
-            loadstring(game:HttpGet("https://raw.githubusercontent.com/Yungengxin/roblox/refs/heads/main/Rb-Hub"))()
-        end})
-        
-        local Tab6 = Window:MakeTab({Name = "生存与杀手", Icon = "rbxassetid://7733779610"})
-        Tab6:AddButton({Name = "生存与杀手", Callback = function()
-            loadstring(game:HttpGet("https://raw.githubusercontent.com/Milan08Studio/ChairWare/main/main.lua"))()
-        end})
-        
-        local Tab7 = Window:MakeTab({Name = "爱德华", Icon = "rbxassetid://7733779610"})
-        Tab7:AddButton({Name = "爱德华", Callback = function()
-            loadstring(game:HttpGet("https://raw.githubusercontent.com/gumanba/Scripts/main/Edward"))()
-        end})
-        
-        local Tab8 = Window:MakeTab({Name = "活了7天", Icon = "rbxassetid://7733779610"})
-        Tab8:AddButton({Name = "活了7天", Callback = function()
-            loadstring(game:HttpGet("https://rawscripts.net/raw/Universal-Script-7-days-to-live-36824"))()
-        end})
-        
-        local Tab9 = Window:MakeTab({Name = "死铁轨", Icon = "rbxassetid://7733979610"})
-        Tab9:AddButton({Name = "死铁轨", Callback = function()
-            loadstring(game:HttpGet("https://raw.githubusercontent.com/iopjklbnmsss/SansHubScript/refs/heads/main/SansHub"))()
-        end})
-
-        local Tab10 = Window:MakeTab({Name = "一路向西", Icon = "rbxassetid://7733979610"})
-        Tab10:AddButton({Name = "一路向西刷钱", Callback = function()
-            loadstring(game:HttpGet("https://raw.githubusercontent.com/123hubd7gh/123hubd7gh/refs/heads/main/%E4%B8%80%E8%B7%AF%E5%90%91%E8%A5%BF%20%E8%B5%9A%E9%92%B1"))()
-        end})
-        
-        local Tab11 = Window:MakeTab({Name = "造一架飞机", Icon = "rbxassetid://7733979610"})
-        Tab11:AddButton({Name = "造一架飞机刷钱", Callback = function()
-            loadstring(game:HttpGet("https://raw.githubusercontent.com/123hubd7gh/123hubd7gh/refs/heads/main/%E5%BB%BA%E9%80%A0%E4%B8%80%E6%9E%B6%E9%A3%9E%E6%9C%BA%20%E8%87%AA%E5%8A%A8%E5%88%B7%E9%92%B1"))()
-        end})
-
-        -- 设置Tab - 卡密管理
-        local SettingsTab = Window:MakeTab({Name = "设置", Icon = "rbxassetid://7733779610"})
-        SettingsTab:AddButton({
-            Name = "清除卡密",
-            Callback = function()
-                if KeySystem.StorageMethod == "File" and isfile and isfile(KeySystem.KeyFile) then
-                    delfile(KeySystem.KeyFile)
-                else
-                    getgenv().StitchSavedKey = nil
-                end
-                OrionLib:MakeNotification({
-                    Name = "成功",
-                    Content = "卡密已清除，请重新验证",
-                    Time = 3
-                })
-                Window:Destroy()
-                task.wait(1)
-                ShowKeyWindow()
-            end
-        })
-        
-        SettingsTab:AddLabel("卡密状态: " .. (KeySystem.CurrentKey and "已验证" or "未验证"))
-        SettingsTab:AddLabel("当前卡密: " .. (KeySystem.CurrentKey or "无"))
-        SettingsTab:AddLabel("存储方式: " .. KeySystem.StorageMethod)
-        
-        SettingsTab:AddButton({
-            Name = "一键复制当前卡密",
-            Callback = function()
-                if KeySystem.CurrentKey and KeySystem.CurrentKey ~= "" then
-                    local success = CopyToClipboard(KeySystem.CurrentKey)
-                    ShowCopyNotification(success, KeySystem.CurrentKey)
-                else
-                    OrionLib:MakeNotification({
-                        Name = "复制失败",
-                        Content = "当前没有卡密可复制",
-                        Time = 3
-                    })
-                end
-            end
-        })
-        
-        SettingsTab:AddButton({
-            Name = "一键复制Discord链接",
-            Callback = function()
-                local discordLink = "https://discord.gg/xVUf7H9M"
-                local success = CopyToClipboard(discordLink)
-                ShowCopyNotification(success, discordLink)
-            end
-        })
-        
-        -- 启动
-        OrionLib:Init()
+-- 更新鼠标状态
+function ImGui:updateMouse(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement then
+        self.mousePosition = Vector2.new(input.Position.X, input.Position.Y)
     end
     
-    -- 主逻辑：检查是否有已验证的卡密
-    local savedKey = LoadKey()
-    if savedKey and VerifyKey(savedKey) then
-        KeySystem.CurrentKey = savedKey
-        KeySystem.IsVerified = true
-        
-        -- 创建坤坤大帝脚本动画
-        CreateKunKunAnimation()
-        
-        -- 延迟后显示主窗口
-        task.wait(2.5)
-        ShowMainWindow()
-    else
-        ShowKeyWindow()
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        self.mouseDown = (input.UserInputState == Enum.UserInputState.Begin)
     end
-    
-    -- 添加卡密管理命令
-    getgenv().SetKey = function(key)
-        if VerifyKey(key) then
-            KeySystem.CurrentKey = key
-            KeySystem.IsVerified = true
-            SaveKey(key)
-            OrionLib:MakeNotification({
-                Name = "成功",
-                Content = "卡密已通过命令设置",
-                Time = 2
-            })
-        else
-            OrionLib:MakeNotification({
-                Name = "失败",
-                Content = "无效的卡密",
-                Time = 2
-            })
+end
+
+-- 清理所有UI元素
+function ImGui:cleanup()
+    for _, window in ipairs(self.windows) do
+        for _, item in ipairs(window.items) do
+            if item.type == "button" then
+                item.frame:Destroy()
+                item.label:Destroy()
+            elseif item.type == "checkbox" then
+                item.frame:Destroy()
+                item.label:Destroy()
+            elseif item.type == "slider" then
+                item.bg:Destroy()
+                item.fill:Destroy()
+                item.handle:Destroy()
+                item.label:Destroy()
+            elseif item.type == "input" then
+                item.bg:Destroy()
+                item.label:Destroy()
+            elseif item.type == "label" then
+                item.text:Destroy()
+            end
         end
     end
-    
-    getgenv().ClearKey = function()
-        if KeySystem.StorageMethod == "File" and isfile and isfile(KeySystem.KeyFile) then
-            delfile(KeySystem.KeyFile)
-        else
-            getgenv().StitchSavedKey = nil
-        end
-        KeySystem.IsVerified = false
-        OrionLib:MakeNotification({
-            Name = "成功",
-            Content = "卡密已清除",
-            Time = 2
-        })
-    end
-end)()
+    self.windows = {}
+end
+
+return ImGui
