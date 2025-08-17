@@ -366,7 +366,7 @@ end
         end
         
         -----------------------------------------------------------------
-        -- ⑤ 双独立 FOV（白跟随 + 橙固定）都参与瞄准判定 - 修复版
+        -- ⑤ 双独立 FOV（白跟随 + 橙固定）都参与瞄准判定 - 增强版
         -----------------------------------------------------------------
         -- 通用参数
         local aimbotEnabled      = false
@@ -377,6 +377,16 @@ end
         local aimbotCheckTeam    = false  -- 默认关闭"仅瞄准敌人"
         local lastFire = 0
         local aimbotConn
+        local aimbotMode = "Distance"  -- 瞄准方式: "Distance" 或 "Crosshair"
+        local wallCheckEnabled = true  -- 默认开启墙体检测
+        local aimLineEnabled = false   -- 自瞄线条开关
+        local aimLine = Drawing.new("Line") -- 自瞄线条对象
+        
+        -- 初始化自瞄线条
+        aimLine.Visible = false
+        aimLine.Thickness = 1.5
+        aimLine.Color = Color3.fromRGB(0, 255, 0)
+        aimLine.ZIndex = 11
         
         -- 缺失变量一次性补全
         local Camera = workspace.CurrentCamera
@@ -427,6 +437,8 @@ end
         end
         
         local function isVisible(pos, ignore)
+            if not wallCheckEnabled then return true end
+            
             local origin = Camera.CFrame.Position
             local direction = (pos - origin).Unit
             local ray = Ray.new(origin, direction * (origin - pos).Magnitude)
@@ -459,7 +471,7 @@ end
             return false
         end
         
-        -- 取最近目标（以固定中心为基准）
+        -- 取最近目标（根据选择的瞄准方式）
         local function getClosest()
             local closest, minDist = nil, math.huge
             local center = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
@@ -481,7 +493,15 @@ end
                 local sp = Camera:WorldToViewportPoint(aimPos)
                 if sp.Z <= 0 then continue end
                 
-                local dist = (Vector2.new(sp.X, sp.Y) - center).Magnitude
+                local dist
+                if aimbotMode == "Distance" then
+                    -- 3D距离
+                    dist = (aimPos - Camera.CFrame.Position).Magnitude
+                else
+                    -- 2D屏幕距离
+                    dist = (Vector2.new(sp.X, sp.Y) - center).Magnitude
+                end
+                
                 if dist < minDist then
                     minDist, closest = dist, plr
                 end
@@ -494,17 +514,40 @@ end
             if aimbotConn then return end
             
             aimbotConn = game:GetService("RunService").RenderStepped:Connect(function()
-                if not aimbotEnabled then return end
+                if not aimbotEnabled then 
+                    aimLine.Visible = false
+                    return 
+                end
                 
                 -- 更新跟随圆
                 mouseFovCircle.Position = UserInputService:GetMouseLocation()
         
                 local target = getClosest()
-                if not target or not target.Character then return end
+                if not target or not target.Character then 
+                    aimLine.Visible = false
+                    return 
+                end
                 
                 local aimPos = getAimPos(target.Character)
-                if not aimPos then return end
+                if not aimPos then 
+                    aimLine.Visible = false
+                    return 
+                end
         
+                -- 更新自瞄线条
+                if aimLineEnabled then
+                    local screenPos = Camera:WorldToViewportPoint(aimPos)
+                    if screenPos.Z > 0 then
+                        aimLine.From = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
+                        aimLine.To = Vector2.new(screenPos.X, screenPos.Y)
+                        aimLine.Visible = true
+                    else
+                        aimLine.Visible = false
+                    end
+                else
+                    aimLine.Visible = false
+                end
+                
                 -- 安全 + 角度限制
                 local delta = aimPos - Camera.CFrame.Position
                 if delta.Magnitude < 0.1 then return end
@@ -539,10 +582,11 @@ end
             end
             mouseFovCircle.Visible = false
             fixedFovCircle.Visible = false
+            aimLine.Visible = false
         end
         
         -----------------------------------------------------------------
-        -- UI 构建（修复版）
+        -- UI 构建（增强版）
         -----------------------------------------------------------------
         local aimbotSec = Tab4:AddSection({Name = "AI-Aimbot"})
         aimbotSec:AddToggle({
@@ -561,6 +605,22 @@ end
             Name = "仅瞄准敌人",
             Default = aimbotCheckTeam,
             Callback = function(v) aimbotCheckTeam = v end
+        })
+        aimbotSec:AddToggle({
+            Name = "墙体检测",
+            Default = wallCheckEnabled,
+            Callback = function(v) wallCheckEnabled = v end
+        })
+        aimbotSec:AddToggle({
+            Name = "显示自瞄线条",
+            Default = aimLineEnabled,
+            Callback = function(v) aimLineEnabled = v end
+        })
+        aimbotSec:AddDropdown({
+            Name = "瞄准方式",
+            Default = aimbotMode,
+            Options = {"Distance", "Crosshair"},
+            Callback = function(v) aimbotMode = v end
         })
         
         local mouseSec = Tab4:AddSection({Name = "跟随鼠标 FOV"})
@@ -842,6 +902,7 @@ end
         local espEnabled = false
         local espCache = {}
         local tracerPosition = "Bottom"  -- 线条位置: "Top" 或 "Bottom"
+        local boxLinePosition = "Top"    -- 方框线条位置: "Top" 或 "Bottom"
         
         -- 获取队伍颜色
         local function getTeamColor(plr)
@@ -860,7 +921,8 @@ end
                 Distance = Drawing.new("Text"),
                 HealthBar = Drawing.new("Quad"),
                 HealthText = Drawing.new("Text"),
-                Tracer = Drawing.new("Line")  -- 新增线条
+                Tracer = Drawing.new("Line"),  -- 新增线条
+                BoxLine = Drawing.new("Line")  -- 方框线条
             }
             
             -- 设置初始属性
@@ -889,6 +951,9 @@ end
             
             esp.Tracer.Thickness = 1.5  -- 线条粗细
             esp.Tracer.ZIndex = 4
+            
+            esp.BoxLine.Thickness = 1.5  -- 方框线条粗细
+            esp.BoxLine.ZIndex = 5
             
             espCache[plr] = esp
             return esp
@@ -999,6 +1064,21 @@ end
                 
                 esp.Tracer.From = startPoint
                 esp.Tracer.To = endPoint
+                
+                -- 更新方框线条
+                esp.BoxLine.Visible = true
+                esp.BoxLine.Color = color
+                
+                -- 根据选择的位置设置方框线条
+                if boxLinePosition == "Top" then
+                    -- 从方框顶部中心到屏幕顶部中心
+                    esp.BoxLine.From = Vector2.new(headPos.X, headPos.Y)
+                    esp.BoxLine.To = Vector2.new(Camera.ViewportSize.X/2, 0)
+                else
+                    -- 从方框底部中心到屏幕底部中心
+                    esp.BoxLine.From = Vector2.new(headPos.X, headPos.Y + height)
+                    esp.BoxLine.To = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y)
+                end
             end
             
             -- 清理不存在的玩家ESP
@@ -1048,6 +1128,16 @@ end
             Options = {"Top", "Bottom"},
             Callback = function(value)
                 tracerPosition = value
+            end
+        })
+        
+        -- 添加方框线条位置选择
+        espSection:AddDropdown({
+            Name = "方框线条位置",
+            Default = boxLinePosition,
+            Options = {"Top", "Bottom"},
+            Callback = function(value)
+                boxLinePosition = value
             end
         })
         
