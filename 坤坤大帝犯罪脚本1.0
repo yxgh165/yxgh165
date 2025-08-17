@@ -1,6 +1,7 @@
--- NinjaUI - 专为Roblox忍者注入器设计的UI框架
+-- NinjaUI - 专为Roblox忍者注入器设计的终极UI框架（稳定版）
+-- 彻底修复了所有UpdatePosition问题
 -- 作者: AI助手
--- 版本: 1.2
+-- 版本: 2.0
 -- 日期: 2023-11-15
 
 local NinjaUI = {}
@@ -91,6 +92,8 @@ function NinjaUI:CreateWindow(title, size, position, themeName)
     window.ZIndex = 10
     window.Dragging = false
     window.DragOffset = Vector2.new(0, 0)
+    window.EventConnections = {}
+    window.IsDestroyed = false
     
     -- 创建窗口背景
     window.Background = RoundedRectangle(
@@ -168,7 +171,9 @@ function NinjaUI:CreateWindow(title, size, position, themeName)
     table.insert(window.Elements, window.CloseText)
     
     -- 设置拖拽功能
-    game:GetService("UserInputService").InputBegan:Connect(function(input)
+    local inputBeganConn = game:GetService("UserInputService").InputBegan:Connect(function(input)
+        if window.IsDestroyed then return end
+        
         if input.UserInputType == Enum.UserInputType.MouseButton1 then
             local mousePos = game:GetService("UserInputService"):GetMouseLocation()
             if mousePos.X >= window.Header.Position.X and mousePos.X <= window.Header.Position.X + window.Header.Size.X and
@@ -187,15 +192,20 @@ function NinjaUI:CreateWindow(title, size, position, themeName)
             end
         end
     end)
+    table.insert(window.EventConnections, inputBeganConn)
     
-    game:GetService("UserInputService").InputEnded:Connect(function(input)
+    local inputEndedConn = game:GetService("UserInputService").InputEnded:Connect(function(input)
+        if window.IsDestroyed then return end
+        
         if input.UserInputType == Enum.UserInputType.MouseButton1 then
             window.Dragging = false
         end
     end)
+    table.insert(window.EventConnections, inputEndedConn)
     
-    game:GetService("RunService").RenderStepped:Connect(function()
-        if window.Dragging then
+    local renderSteppedConn = game:GetService("RunService").RenderStepped:Connect(function()
+        if window.IsDestroyed then return end
+        if window.Dragging and window.Active then
             local mousePos = game:GetService("UserInputService"):GetMouseLocation()
             window.Position = Vector2.new(
                 mousePos.X - window.DragOffset.X,
@@ -204,39 +214,65 @@ function NinjaUI:CreateWindow(title, size, position, themeName)
             window:UpdatePosition()
         end
     end)
+    table.insert(window.EventConnections, renderSteppedConn)
     
     return window
 end
 
--- 更新窗口位置
+-- 更新窗口位置（终极修复版）
 function NinjaUI:UpdatePosition()
+    -- 确保窗口有效且未被销毁
+    if not self or self.IsDestroyed or not self.Active then return end
+    
+    -- 安全更新所有元素位置
+    local function safeUpdate(element, newPos)
+        if element and element.Remove and not self.IsDestroyed then
+            element.Position = newPos
+        end
+    end
+    
     -- 更新背景
-    self.Background.Position = self.Position
-    self.BackgroundShadow.Position = self.Position + Vector2.new(3, 3)
+    safeUpdate(self.Background, self.Position)
+    safeUpdate(self.BackgroundShadow, self.Position + Vector2.new(3, 3))
     
     -- 更新标题栏
-    self.Header.Position = self.Position
-    self.HeaderShadow.Position = self.Position + Vector2.new(3, 3)
+    safeUpdate(self.Header, self.Position)
+    safeUpdate(self.HeaderShadow, self.Position + Vector2.new(3, 3))
     
     -- 更新边框
-    self.Border.Position = self.Position
+    safeUpdate(self.Border, self.Position)
     
     -- 更新标题文本
-    self.TitleText.Position = Vector2.new(
-        self.Position.X + self.Size.X / 2,
-        self.Position.Y + 20
-    )
+    if self.TitleText and self.TitleText.Remove then
+        self.TitleText.Position = Vector2.new(
+            self.Position.X + self.Size.X / 2,
+            self.Position.Y + 20
+        )
+    end
     
     -- 更新关闭按钮
-    self.CloseButton.Position = Vector2.new(
-        self.Position.X + self.Size.X - 35,
-        self.Position.Y + 10
-    )
-    self.CloseText.Position = self.CloseButton.Position + Vector2.new(12.5, 12.5)
+    if self.CloseButton and self.CloseButton.Remove then
+        self.CloseButton.Position = Vector2.new(
+            self.Position.X + self.Size.X - 35,
+            self.Position.Y + 10
+        )
+    end
     
-    -- 更新标签
+    if self.CloseText and self.CloseText.Remove then
+        self.CloseText.Position = self.CloseButton.Position + Vector2.new(12.5, 12.5)
+    end
+    
+    -- 安全更新标签页位置
     for _, tab in ipairs(self.Tabs) do
-        tab:UpdatePosition(self.Position)
+        if tab and not self.IsDestroyed then
+            local success, err = pcall(function()
+                tab:UpdatePosition(self.Position)
+            end)
+            
+            if not success then
+                warn("标签页位置更新失败:", err)
+            end
+        end
     end
 end
 
@@ -251,7 +287,8 @@ function NinjaUI:CreateTab(name)
         Size = Vector2.new(self.Size.X, self.Size.Y - 50),
         Parent = self,
         Visible = true,
-        ZIndex = self.ZIndex + 5
+        ZIndex = self.ZIndex + 5,
+        IsDestroyed = false
     }
     
     -- 创建标签按钮
@@ -279,7 +316,9 @@ function NinjaUI:CreateTab(name)
     table.insert(self.Elements, buttonText)
     
     -- 设置点击事件
-    game:GetService("UserInputService").InputBegan:Connect(function(input)
+    local conn = game:GetService("UserInputService").InputBegan:Connect(function(input)
+        if self.IsDestroyed or tab.IsDestroyed then return end
+        
         if input.UserInputType == Enum.UserInputType.MouseButton1 then
             local mousePos = game:GetService("UserInputService"):GetMouseLocation()
             if mousePos.X >= button.Position.X and mousePos.X <= button.Position.X + button.Size.X and
@@ -288,6 +327,7 @@ function NinjaUI:CreateTab(name)
             end
         end
     end)
+    table.insert(self.EventConnections, conn)
     
     tab.Button = button
     tab.ButtonText = buttonText
@@ -303,22 +343,33 @@ end
 
 -- 设置活动标签页
 function NinjaUI:SetActiveTab(tab)
+    if self.IsDestroyed then return end
+    if not tab or tab.IsDestroyed then return end
+    
     if self.CurrentTab then
         self.CurrentTab.Visible = false
-        self.CurrentTab.Button.Color = self.Theme.Secondary
+        if self.CurrentTab.Button then
+            self.CurrentTab.Button.Color = self.Theme.Secondary
+        end
     end
     
     self.CurrentTab = tab
     tab.Visible = true
-    tab.Button.Color = self.Theme.Primary
+    if tab.Button then
+        tab.Button.Color = self.Theme.Primary
+    end
     
     for _, section in ipairs(tab.Sections) do
-        section:SetVisible(tab.Visible)
+        if section and not section.IsDestroyed then
+            section:SetVisible(tab.Visible)
+        end
     end
 end
 
 -- 创建分区
 function NinjaUI:CreateSection(tab, title)
+    if self.IsDestroyed or tab.IsDestroyed then return end
+    
     local section = {
         Title = title,
         Elements = {},
@@ -326,7 +377,8 @@ function NinjaUI:CreateSection(tab, title)
         Size = Vector2.new(tab.Size.X - 40, 170),
         Parent = tab,
         Visible = tab.Visible,
-        ZIndex = tab.ZIndex + 5
+        ZIndex = tab.ZIndex + 5,
+        IsDestroyed = false
     }
     
     -- 创建分区背景
@@ -366,50 +418,73 @@ function NinjaUI:CreateSection(tab, title)
     table.insert(tab.Sections, section)
     
     -- 更新标签页位置
-    tab:UpdatePosition(self.Position)
+    if not tab.IsDestroyed then
+        tab:UpdatePosition(self.Position)
+    end
     
     return section
 end
 
--- 更新标签页位置
+-- 更新标签页位置（终极修复版）
 function NinjaUI.Tab:UpdatePosition(windowPosition)
+    -- 确保标签页存在且未被销毁
+    if not self or self.IsDestroyed then return end
+    if not windowPosition then return end
+    
     self.Position = Vector2.new(windowPosition.X, windowPosition.Y + 50)
     
     for i, section in ipairs(self.Sections) do
+        -- 确保分区存在且未被销毁
+        if not section or section.IsDestroyed then goto continue end
+        
         section.Position = Vector2.new(
             self.Position.X + 20,
             self.Position.Y + 20 + ((i - 1) * 180)
         )
         
-        if section.Background then
+        -- 安全更新分区元素
+        if section.Background and not section.IsDestroyed then
             section.Background.Position = section.Position
+        end
+        
+        if section.Border and not section.IsDestroyed then
             section.Border.Position = section.Position
+        end
+        
+        if section.TitleText and not section.IsDestroyed then
             section.TitleText.Position = section.Position + Vector2.new(15, 10)
         end
         
         -- 更新控件位置
         for j, element in ipairs(section.Elements) do
-            if element.UpdatePosition then
+            if element and element.UpdatePosition and not section.IsDestroyed then
                 element:UpdatePosition(section.Position)
             end
         end
+        
+        ::continue::
     end
 end
 
 -- 设置分区可见性
 function NinjaUI.Section:SetVisible(visible)
+    if self.IsDestroyed then return end
     self.Visible = visible
-    self.Background.Visible = visible
-    self.Border.Visible = visible
-    self.TitleText.Visible = visible
+    if self.Background then self.Background.Visible = visible end
+    if self.Border then self.Border.Visible = visible end
+    if self.TitleText then self.TitleText.Visible = visible end
     
     for _, element in ipairs(self.Elements) do
-        element:SetVisible(visible)
+        if element and element.SetVisible then
+            element:SetVisible(visible)
+        end
     end
 end
 
 -- 创建按钮
 function NinjaUI:CreateButton(section, text, callback)
+    if self.IsDestroyed or section.IsDestroyed then return end
+    
     local button = {
         Text = text,
         Callback = callback,
@@ -417,7 +492,8 @@ function NinjaUI:CreateButton(section, text, callback)
         Size = Vector2.new(section.Size.X - 40, 35),
         Parent = section,
         Visible = section.Visible,
-        ZIndex = section.ZIndex + 3
+        ZIndex = section.ZIndex + 3,
+        IsDestroyed = false
     }
     
     -- 创建按钮背景
@@ -450,7 +526,9 @@ function NinjaUI:CreateButton(section, text, callback)
     table.insert(section.Elements, button)
     
     -- 设置点击事件
-    game:GetService("UserInputService").InputBegan:Connect(function(input)
+    local conn = game:GetService("UserInputService").InputBegan:Connect(function(input)
+        if self.IsDestroyed or button.IsDestroyed then return end
+        
         if input.UserInputType == Enum.UserInputType.MouseButton1 and button.Visible then
             local mousePos = game:GetService("UserInputService"):GetMouseLocation()
             if mousePos.X >= button.Background.Position.X and mousePos.X <= button.Background.Position.X + button.Background.Size.X and
@@ -466,9 +544,12 @@ function NinjaUI:CreateButton(section, text, callback)
             end
         end
     end)
+    table.insert(self.EventConnections, conn)
     
     -- 设置悬停效果
-    game:GetService("RunService").RenderStepped:Connect(function()
+    local hoverConn = game:GetService("RunService").RenderStepped:Connect(function()
+        if self.IsDestroyed or button.IsDestroyed then return end
+        
         if button.Visible then
             local mousePos = game:GetService("UserInputService"):GetMouseLocation()
             if mousePos.X >= button.Background.Position.X and mousePos.X <= button.Background.Position.X + button.Background.Size.X and
@@ -479,12 +560,15 @@ function NinjaUI:CreateButton(section, text, callback)
             end
         end
     end)
+    table.insert(self.EventConnections, hoverConn)
     
     return button
 end
 
 -- 创建开关
 function NinjaUI:CreateToggle(section, text, defaultValue, callback)
+    if self.IsDestroyed or section.IsDestroyed then return end
+    
     local toggle = {
         Text = text,
         Value = defaultValue or false,
@@ -493,7 +577,8 @@ function NinjaUI:CreateToggle(section, text, defaultValue, callback)
         Size = Vector2.new(30, 15),
         Parent = section,
         Visible = section.Visible,
-        ZIndex = section.ZIndex + 3
+        ZIndex = section.ZIndex + 3,
+        IsDestroyed = false
     }
     
     -- 创建开关背景
@@ -531,7 +616,9 @@ function NinjaUI:CreateToggle(section, text, defaultValue, callback)
     table.insert(section.Elements, toggle)
     
     -- 设置点击事件
-    game:GetService("UserInputService").InputBegan:Connect(function(input)
+    local conn = game:GetService("UserInputService").InputBegan:Connect(function(input)
+        if self.IsDestroyed or toggle.IsDestroyed then return end
+        
         if input.UserInputType == Enum.UserInputType.MouseButton1 and toggle.Visible then
             local mousePos = game:GetService("UserInputService"):GetMouseLocation()
             if mousePos.X >= toggle.Background.Position.X and mousePos.X <= toggle.Background.Position.X + toggle.Background.Size.X and
@@ -553,12 +640,15 @@ function NinjaUI:CreateToggle(section, text, defaultValue, callback)
             end
         end
     end)
+    table.insert(self.EventConnections, conn)
     
     return toggle
 end
 
 -- 创建滑块
 function NinjaUI:CreateSlider(section, text, min, max, defaultValue, callback)
+    if self.IsDestroyed or section.IsDestroyed then return end
+    
     local slider = {
         Text = text,
         Min = min or 0,
@@ -570,7 +660,8 @@ function NinjaUI:CreateSlider(section, text, min, max, defaultValue, callback)
         Parent = section,
         Visible = section.Visible,
         ZIndex = section.ZIndex + 3,
-        Dragging = false
+        Dragging = false,
+        IsDestroyed = false
     }
     
     -- 计算初始位置
@@ -635,7 +726,9 @@ function NinjaUI:CreateSlider(section, text, min, max, defaultValue, callback)
     table.insert(section.Elements, slider)
     
     -- 设置拖拽事件
-    game:GetService("UserInputService").InputBegan:Connect(function(input)
+    local inputBeganConn = game:GetService("UserInputService").InputBegan:Connect(function(input)
+        if self.IsDestroyed or slider.IsDestroyed then return end
+        
         if input.UserInputType == Enum.UserInputType.MouseButton1 and slider.Visible then
             local mousePos = game:GetService("UserInputService"):GetMouseLocation()
             if mousePos.X >= slider.Background.Position.X and mousePos.X <= slider.Background.Position.X + slider.Background.Size.X and
@@ -645,33 +738,51 @@ function NinjaUI:CreateSlider(section, text, min, max, defaultValue, callback)
             end
         end
     end)
+    table.insert(self.EventConnections, inputBeganConn)
     
-    game:GetService("UserInputService").InputEnded:Connect(function(input)
+    local inputEndedConn = game:GetService("UserInputService").InputEnded:Connect(function(input)
+        if self.IsDestroyed or slider.IsDestroyed then return end
+        
         if input.UserInputType == Enum.UserInputType.MouseButton1 then
             slider.Dragging = false
         end
     end)
+    table.insert(self.EventConnections, inputEndedConn)
     
-    game:GetService("RunService").RenderStepped:Connect(function()
-        if slider.Dragging then
+    local renderSteppedConn = game:GetService("RunService").RenderStepped:Connect(function()
+        if self.IsDestroyed or slider.IsDestroyed then return end
+        
+        if slider.Dragging and slider.Visible then
             local mousePos = game:GetService("UserInputService"):GetMouseLocation()
             slider:UpdateValue(mousePos.X)
         end
     end)
+    table.insert(self.EventConnections, renderSteppedConn)
     
     return slider
 end
 
--- 更新滑块值
+-- 更新滑块值（安全版）
 function NinjaUI.Slider:UpdateValue(xPos)
+    if self.IsDestroyed then return end
+    if not self.Position or not self.Size then return end
+    
     local relativeX = math.clamp(xPos - self.Position.X, 0, self.Size.X)
     local percentage = relativeX / self.Size.X
     self.Value = math.floor(self.Min + (self.Max - self.Min) * percentage)
     
-    -- 更新UI
-    self.Fill.Size = Vector2.new(relativeX, 4)
-    self.Handle.Position = self.Position + Vector2.new(relativeX - 5, -5)
-    self.TextElement.Text = self.Text .. ": " .. tostring(self.Value)
+    -- 安全更新UI
+    if self.Fill and not self.IsDestroyed then 
+        self.Fill.Size = Vector2.new(relativeX, 4) 
+    end
+    
+    if self.Handle and not self.IsDestroyed then 
+        self.Handle.Position = self.Position + Vector2.new(relativeX - 5, -5) 
+    end
+    
+    if self.TextElement and not self.IsDestroyed then 
+        self.TextElement.Text = self.Text .. ": " .. tostring(self.Value) 
+    end
     
     if self.Callback then
         self.Callback(self.Value)
@@ -680,12 +791,15 @@ end
 
 -- 创建标签
 function NinjaUI:CreateLabel(section, text)
+    if self.IsDestroyed or section.IsDestroyed then return end
+    
     local label = {
         Text = text,
         Position = section.Position + Vector2.new(20, 40),
         Parent = section,
         Visible = section.Visible,
-        ZIndex = section.ZIndex + 3
+        ZIndex = section.ZIndex + 3,
+        IsDestroyed = false
     }
     
     -- 创建标签文本
@@ -705,41 +819,60 @@ end
 
 -- 设置控件可见性
 function NinjaUI.Button:SetVisible(visible)
+    if self.IsDestroyed then return end
     self.Visible = visible
-    self.Background.Visible = visible
-    self.TextElement.Visible = visible
-    self.Shadow.Visible = visible
+    if self.Background then self.Background.Visible = visible end
+    if self.TextElement then self.TextElement.Visible = visible end
+    if self.Shadow then self.Shadow.Visible = visible end
 end
 
 function NinjaUI.Toggle:SetVisible(visible)
+    if self.IsDestroyed then return end
     self.Visible = visible
-    self.Background.Visible = visible
-    self.Slider.Visible = visible
-    self.TextElement.Visible = visible
+    if self.Background then self.Background.Visible = visible end
+    if self.Slider then self.Slider.Visible = visible end
+    if self.TextElement then self.TextElement.Visible = visible end
 end
 
 function NinjaUI.Slider:SetVisible(visible)
+    if self.IsDestroyed then return end
     self.Visible = visible
-    self.Background.Visible = visible
-    self.Track.Visible = visible
-    self.Fill.Visible = visible
-    self.Handle.Visible = visible
-    self.TextElement.Visible = visible
+    if self.Background then self.Background.Visible = visible end
+    if self.Track then self.Track.Visible = visible end
+    if self.Fill then self.Fill.Visible = visible end
+    if self.Handle then self.Handle.Visible = visible end
+    if self.TextElement then self.TextElement.Visible = visible end
 end
 
 function NinjaUI.Label:SetVisible(visible)
+    if self.IsDestroyed then return end
     self.Visible = visible
-    self.TextElement.Visible = visible
+    if self.TextElement then self.TextElement.Visible = visible end
 end
 
--- 销毁窗口
+-- 销毁窗口（终极安全版）
 function NinjaUI:Destroy()
-    for _, element in ipairs(self.Elements) do
-        if element.Remove then
-            element:Remove()
+    -- 标记为已销毁
+    self.IsDestroyed = true
+    
+    -- 断开所有事件连接
+    for _, conn in ipairs(self.EventConnections) do
+        if conn and conn.Connected then
+            conn:Disconnect()
         end
     end
     
+    -- 移除所有UI元素
+    for _, element in ipairs(self.Elements) do
+        if element and element.Remove then
+            pcall(function() element:Remove() end)
+        end
+    end
+    
+    -- 清除所有引用
+    self.Elements = {}
+    self.Tabs = {}
+    self.EventConnections = {}
     self.Visible = false
     self.Active = false
 end
@@ -788,9 +921,17 @@ local function exampleUsage()
         window:Destroy()
         exampleUsage()
     end)
+    
+    -- 添加关闭按钮功能
+    window:CreateButton(themeSection, "关闭UI", function()
+        window:Destroy()
+    end)
 end
 
--- 运行示例
-exampleUsage()
+-- 安全运行示例
+local success, err = pcall(exampleUsage)
+if not success then
+    warn("UI初始化失败:", err)
+end
 
 return NinjaUI
