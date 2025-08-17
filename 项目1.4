@@ -509,71 +509,71 @@ end
             return closest
         end
         
-        -- 主循环（带防瞬甩）
-        local function startAimbot()
-            if aimbotConn then return end
-            
-            aimbotConn = game:GetService("RunService").RenderStepped:Connect(function()
-                if not aimbotEnabled then 
-                    aimLine.Visible = false
-                    return 
-                end
-                
-                -- 更新跟随圆
-                mouseFovCircle.Position = UserInputService:GetMouseLocation()
-        
-                local target = getClosest()
-                if not target or not target.Character then 
-                    aimLine.Visible = false
-                    return 
-                end
-                
-                local aimPos = getAimPos(target.Character)
-                if not aimPos then 
-                    aimLine.Visible = false
-                    return 
-                end
-        
-                -- 更新自瞄线条
-                if aimLineEnabled then
-                    local screenPos = Camera:WorldToViewportPoint(aimPos)
-                    if screenPos.Z > 0 then
-                        aimLine.From = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
-                        aimLine.To = Vector2.new(screenPos.X, screenPos.Y)
-                        aimLine.Visible = true
-                    else
-                        aimLine.Visible = false
-                    end
-                else
-                    aimLine.Visible = false
-                end
-                
-                -- 安全 + 角度限制
-                local delta = aimPos - Camera.CFrame.Position
-                if delta.Magnitude < 0.1 then return end
-                
-                local targetCF = CFrame.new(Camera.CFrame.Position, Camera.CFrame.Position + delta)
-                local currentLook = Camera.CFrame.LookVector
-                local targetLook = targetCF.LookVector
-                
-                local dot = currentLook:Dot(targetLook)
-                local angle = math.acos(math.clamp(dot, -1, 1))
-                local maxAngle = math.rad(90)
-                
-                if angle <= maxAngle then
-                    local smoothFactor = math.clamp(aimbotSmooth, 0.01, 0.99)
-                    local newLook = currentLook:Lerp(targetLook, 1 - smoothFactor)
-                    Camera.CFrame = CFrame.new(Camera.CFrame.Position, Camera.CFrame.Position + newLook)
-                end
-        
-                if tick() - lastFire > aimbotDelay then
-                    mouse1press()
-                    task.wait(0.05)
-                    mouse1release()
-                    lastFire = tick()
-                end
-            end)
+-- 主循环（带防瞬甩）
+local function startAimbot()
+    if aimbotConn then return end
+    
+    aimbotConn = game:GetService("RunService").RenderStepped:Connect(function()
+        if not aimbotEnabled then 
+            aimLine.Visible = false
+            return 
         end
+        
+        -- 更新跟随圆
+        mouseFovCircle.Position = UserInputService:GetMouseLocation()
+
+        local target = getClosest()
+        if not target or not target.Character then 
+            aimLine.Visible = false
+            return 
+        end
+        
+        local aimPos = getAimPos(target.Character)
+        if not aimPos then 
+            aimLine.Visible = false
+            return 
+        end
+
+        -- 更新自瞄线条
+        if aimLineEnabled then
+            local screenPos = Camera:WorldToViewportPoint(aimPos)
+            if screenPos.Z > 0 then
+                aimLine.From = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
+                aimLine.To = Vector2.new(screenPos.X, screenPos.Y)
+                aimLine.Visible = true
+            else
+                aimLine.Visible = false
+            end
+        else
+            aimLine.Visible = false
+        end
+        
+        -- 安全 + 角度限制
+        local delta = aimPos - Camera.CFrame.Position
+        if delta.Magnitude < 0.01 then return end  -- 将0.1改为0.01
+        
+        local targetCF = CFrame.new(Camera.CFrame.Position, Camera.CFrame.Position + delta)
+        local currentLook = Camera.CFrame.LookVector
+        local targetLook = targetCF.LookVector
+        
+        local dot = currentLook:Dot(targetLook)
+        local angle = math.acos(math.clamp(dot, -1, 1))
+        local maxAngle = math.rad(90)
+        
+        if angle <= maxAngle then
+            local smoothFactor = math.clamp(aimbotSmooth, 0.01, 0.99)
+            local newLook = currentLook:Lerp(targetLook, 1 - smoothFactor)
+            Camera.CFrame = CFrame.new(Camera.CFrame.Position, Camera.CFrame.Position + newLook)
+        end
+
+        if tick() - lastFire > aimbotDelay then
+            mouse1press()
+            task.wait(0.05)
+            mouse1release()
+            lastFire = tick()
+        end
+    end)
+end
         
         local function stopAimbot()
             if aimbotConn then 
