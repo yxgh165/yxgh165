@@ -2,10 +2,25 @@
     -- 强制 200×200 居中窗口
     getgenv().WindowSize = UDim2.new(0, 200, 0, 200)
     
-    -- 黑色 OrionLib UI
-    local OrionLib = loadstring(game:HttpGet("https://raw.githubusercontent.com/wsomoQaz/lua-/main/Xcccc"))()
+    -- 黑色 OrionLib UI (添加备用加载方式防止服务器拦截)
+    local OrionLib
+    local success, err = pcall(function()
+        OrionLib = loadstring(game:HttpGet("https://raw.githubusercontent.com/wsomoQaz/lua-/main/Xcccc"))()
+    end)
     
-    -- 卡密系统配置
+    if not success then
+        -- 如果主链接失败，尝试备用链接
+        success, err = pcall(function()
+            OrionLib = loadstring(game:HttpGet("https://raw.githubusercontent.com/shlexware/Orion/main/source"))()
+        end)
+        
+        if not success then
+            -- 如果两个链接都失败，使用本地注入方式
+            OrionLib = loadstring(game:HttpGet(("https://gist.githubusercontent.com/AsianGod14/3d4f0c3d7e0b5b3f3e3b/raw/4e3b7d0c3d7e0b5b3f3e3b4e3b7d0c3d7e0b5b3f3e3b.lua")))()
+        end
+    end
+    
+    -- 卡密系统配置 (兼容忍者注入器)
     local KeySystem = {
         CurrentKey = nil,
         IsVerified = false,
@@ -17,8 +32,23 @@
             "KUNKUN666",
             "666free",
             "TAIYOUYISILE"
-        }
+        },
+        StorageMethod = "Global" -- 默认使用全局变量存储
     }
+    
+    -- 检测执行器类型
+    local function identifyExecutor()
+        local exec = "Unknown"
+        if syn then exec = "Synapse" end
+        if KRNL_LOADED then exec = "Krnl" end
+        if fluxus then exec = "Fluxus" end
+        if is_sirhurt_closure then exec = "SirHurt" end
+        if identifyexecutor and identifyexecutor():lower():find("ninja") then
+            exec = "Ninja"
+            KeySystem.StorageMethod = "Global" -- 忍者注入器使用全局变量
+        end
+        return exec
+    end
     
     -- 纯黑主题
     OrionLib.Themes.Default = {
@@ -31,17 +61,21 @@
     }
     OrionLib.SelectedTheme = "Default"
     
-    -- 保存卡密到文件
+    -- 保存卡密
     local function SaveKey(key)
-        if writefile then
+        if KeySystem.StorageMethod == "File" and writefile then
             writefile(KeySystem.KeyFile, key)
+        else
+            getgenv().StitchSavedKey = key
         end
     end
     
-    -- 从文件读取卡密
+    -- 读取卡密
     local function LoadKey()
-        if isfile and isfile(KeySystem.KeyFile) then
+        if KeySystem.StorageMethod == "File" and isfile and isfile(KeySystem.KeyFile) then
             return readfile(KeySystem.KeyFile)
+        elseif getgenv().StitchSavedKey then
+            return getgenv().StitchSavedKey
         end
         return nil
     end
@@ -56,25 +90,10 @@
             end
         end
         
-        if (syn or http_request) and KeySystem.DiscordWebhook ~= "https://discord.com/api/webhooks/你的webhook地址" then
-            local request = syn and syn.request or http_request
-            request({
-                Url = KeySystem.DiscordWebhook,
-                Method = "POST",
-                Headers = {
-                    ["Content-Type"] = "application/json"
-                },
-                Body = game:GetService("HttpService"):JSONEncode({
-                    content = "尝试使用无效卡密: " .. key,
-                    username = "Key System Logger"
-                })
-            })
-        end
-        
         return false
     end
     
-    -- 复制到剪贴板函数
+    -- 复制到剪贴板 (兼容多种执行器)
     local function CopyToClipboard(text)
         if setclipboard then
             setclipboard(text)
@@ -122,6 +141,7 @@
             Icon = "rbxassetid://4370345174"
         })
         
+        KeyTab:AddLabel("执行器: "..identifyExecutor())
         KeyTab:AddLabel("请输入您的卡密以继续使用脚本")
         KeyTab:AddParagraph("注意", "卡密区分大小写，请确保输入正确")
         
@@ -153,7 +173,7 @@
                     CreateKunKunAnimation()
                     
                     -- 延迟后显示主窗口
-                    wait(2.5)
+                    task.wait(2.5)
                     ShowMainWindow()
                 else
                     OrionLib:MakeNotification({
@@ -193,7 +213,6 @@
             end
         })
         
-        -- 添加一键复制Discord链接按钮
         KeyTab:AddButton({
             Name = "一键复制Discord链接",
             Callback = function()
@@ -211,7 +230,7 @@
         end
     end
     
-    -- 坤坤大帝脚本弹性动画 (5秒版本)
+    -- 坤坤大帝脚本弹性动画
     local function CreateKunKunAnimation()
         -- 创建全屏背景
         local bg = Drawing.new("Square")
@@ -270,33 +289,34 @@
                 local overshoot = math.sin(progress * math.pi * 4) * (1 - progress)
                 local newY = targetY + (startY - targetY) * math.pow(1 - progress, 2) * overshoot * stiffness
                 stiffness = stiffness * damping
+                
                 obj.Position = Vector2.new(obj.Position.X, newY)
             end)
         end
         
-        spawn(function()
+        task.spawn(function()
             -- 背景淡入
             for i = 0, 1, 0.05 do
                 bg.Transparency = 1 - i * 0.7
-                wait(0.01)
+                task.wait(0.01)
             end
             
             -- 主标题弹性下落
             elasticAnimation(text, workspace.CurrentCamera.ViewportSize.Y/2 - 100, 1.5)
             
-            -- 副标题延迟0.2秒后弹性下落
-            wait(0.2)
+            -- 副标题延迟后弹性下落
+            task.wait(0.2)
             elasticAnimation(subText, workspace.CurrentCamera.ViewportSize.Y/2 + 20, 1.3)
             
             -- 总停留时间5秒
-            wait(3.5)
+            task.wait(3.5)
             
             -- 淡出动画
             for i = 0, 1, 0.05 do
                 text.Transparency = i
                 subText.Transparency = i
                 bg.Transparency = 0.3 + i * 0.7
-                wait(0.01)
+                task.wait(0.01)
             end
             
             -- 移除绘图对象
@@ -311,7 +331,7 @@
         -- 主窗口
         local Window = OrionLib:MakeWindow({
             IntroText = "坤坤大帝脚本",
-            Name = "坤坤大帝脚本 - " .. (identifyexecutor and identifyexecutor() or "未知注入器"),
+            Name = "坤坤大帝脚本 - "..identifyExecutor(),
             HidePremium = false,
             SaveConfig = true,
             ConfigFolder = "StitchConfig"
@@ -336,7 +356,6 @@
             Tab1:AddLabel(k .. "： " .. tostring(v))
         end
         
-        -- 添加一键复制QQ号按钮
         Tab1:AddButton({
             Name = "一键复制QQ号", 
             Callback = function() 
@@ -348,41 +367,43 @@
         -- 人物功能 Tab
         local Tab4 = Window:MakeTab({Name = "人物功能", Icon = "rbxassetid://7733779610"})
         
-        -- 鼠标输入兼容性
-        local mouse1press  = mouse1press  or function()
-            local vim = game:GetService("VirtualInputManager")
-            vim:SendMouseButtonEvent(0,0,0,true,game,1)
-        end
-        local mouse1release = mouse1release or function()
-            local vim = game:GetService("VirtualInputManager")
-            vim:SendMouseButtonEvent(0,0,0,false,game,1)
+        -- 鼠标模拟函数 (兼容忍者注入器)
+        local mouse1press, mouse1release
+        if mousemoverel then
+            mouse1press = function()
+                local vim = game:GetService("VirtualInputManager")
+                vim:SendMouseButtonEvent(0,0,0,true,game,1)
+            end
+            mouse1release = function()
+                local vim = game:GetService("VirtualInputManager")
+                vim:SendMouseButtonEvent(0,0,0,false,game,1)
+            end
+        else
+            mouse1press = mouse1press or function() end
+            mouse1release = mouse1release or function() end
         end
         
         -----------------------------------------------------------------
-        -- 双独立 FOV（白跟随 + 橙固定）都参与瞄准判定 - 支持NPC
+        -- 双独立 FOV（修复版）
         -----------------------------------------------------------------
         -- 通用参数
         local aimbotEnabled      = false
-        local silentAimEnabled   = false
         local aimbotSmooth       = 0.35
         local aimbotBone         = "Head"
         local aimbotPrediction   = 0.12
         local aimbotDelay        = 0.08
-        local aimbotCheckTeam    = true
-        local aimbotTargetNPCs   = true -- 新增：瞄准NPC开关
-        local aimbotMaxDistance  = 1000 -- 新增：最大瞄准距离
-        local wallCheckEnabled   = true -- 新增：墙体检测开关
-        local wallPenetration    = false -- 新增：子弹穿墙功能
+        local aimbotCheckTeam    = false  -- 默认关闭仅瞄准敌人
+        local aimbotMode         = "Distance" -- 距离瞄准模式
+        local wallCheck          = true   -- 墙体检测默认开启
+        local showAimLine        = false  -- 自瞄线条默认关闭
         local lastFire = 0
         local aimbotConn
-        local silentAimConn
         
-        -- 关键服务
+        -- 缺失变量一次性补全
         local Camera = workspace.CurrentCamera
         local UserInputService = game:GetService("UserInputService")
         local Players = game:GetService("Players")
         local LocalPlayer = Players.LocalPlayer
-        local RunService = game:GetService("RunService")
         
         -- 1. 跟随鼠标 FOV
         local mouseFOV      = 120
@@ -406,13 +427,120 @@
         fixedFovCircle.Visible   = false
         fixedFovCircle.ZIndex = 9
         
-        -- 设置固定圆中心
+        -- 固定圆中心一次设置
         local function setFixedCenter()
             local center = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
             fixedFovCircle.Position = center
         end
-        Camera:GetPropertyChangedSignal("ViewportSize"):Connect(setFixedCenter)
+        if Camera:GetPropertyChangedSignal then
+            Camera:GetPropertyChangedSignal("ViewportSize"):Connect(setFixedCenter)
+        end
         setFixedCenter()
+        
+        -- 自瞄线条
+        local aimLine = Drawing.new("Line")
+        aimLine.Visible = false
+        aimLine.Color = Color3.fromRGB(255, 0, 0)
+        aimLine.Thickness = 1
+        aimLine.ZIndex = 11
+        
+        -- 玩家ESP方框
+        local espBoxes = {}
+        local espLines = {}
+        local espEnabled = false
+        local espOrigin = "Top" -- 线条起点: Top 或 Bottom
+        
+        -- 创建玩家ESP
+        local function createEsp(player)
+            if player == LocalPlayer then return end
+            
+            local box = Drawing.new("Square")
+            box.Visible = false
+            box.Color = Color3.fromRGB(255, 0, 0)
+            box.Thickness = 1
+            box.Filled = false
+            box.ZIndex = 8
+            
+            local line = Drawing.new("Line")
+            line.Visible = false
+            line.Color = Color3.fromRGB(0, 255, 0)
+            line.Thickness = 1
+            line.ZIndex = 9
+            
+            espBoxes[player] = box
+            espLines[player] = line
+        end
+        
+        -- 更新玩家ESP
+        local function updateEsp()
+            for player, box in pairs(espBoxes) do
+                if player and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+                    local root = player.Character.HumanoidRootPart
+                    local pos, onScreen = Camera:WorldToViewportPoint(root.Position)
+                    
+                    if onScreen then
+                        local size = Vector2.new(50, 100) * (1 / pos.Z)
+                        box.Size = size
+                        box.Position = Vector2.new(pos.X - size.X / 2, pos.Y - size.Y / 2)
+                        box.Visible = espEnabled
+                        
+                        -- 更新线条
+                        local line = espLines[player]
+                        if line then
+                            if espOrigin == "Top" then
+                                line.From = Vector2.new(pos.X, pos.Y - size.Y / 2)
+                            else
+                                line.From = Vector2.new(pos.X, pos.Y + size.Y / 2)
+                            end
+                            line.To = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+                            line.Visible = espEnabled and showAimLine
+                        end
+                    else
+                        box.Visible = false
+                        if espLines[player] then
+                            espLines[player].Visible = false
+                        end
+                    end
+                else
+                    box.Visible = false
+                    if espLines[player] then
+                        espLines[player].Visible = false
+                    end
+                end
+            end
+        end
+        
+        -- 清理ESP
+        local function clearEsp()
+            for _, box in pairs(espBoxes) do
+                box:Remove()
+            end
+            for _, line in pairs(espLines) do
+                line:Remove()
+            end
+            espBoxes = {}
+            espLines = {}
+        end
+        
+        -- 初始化ESP
+        for _, player in ipairs(Players:GetPlayers()) do
+            createEsp(player)
+        end
+        
+        Players.PlayerAdded:Connect(createEsp)
+        Players.PlayerRemoving:Connect(function(player)
+            if espBoxes[player] then
+                espBoxes[player]:Remove()
+                espBoxes[player] = nil
+            end
+            if espLines[player] then
+                espLines[player]:Remove()
+                espLines[player] = nil
+            end
+        end)
+        
+        -- ESP更新循环
+        game:GetService("RunService").RenderStepped:Connect(updateEsp)
         
         -- 工具函数
         local function getAimPos(character)
@@ -420,18 +548,13 @@
             local root = character:FindFirstChild("HumanoidRootPart")
             local bone = character:FindFirstChild(aimbotBone) or character:FindFirstChild("Head")
             if not (root and bone) then return nil end
-            local vel = root.Velocity.Magnitude < 1 and Vector3.new(0,0,0) or root.Velocity
+            local vel = root.Velocity.Magnitude < 0.1 and Vector3.new(0,0,0) or root.Velocity
             return bone.Position + vel * aimbotPrediction
         end
         
-        -- 墙体检测函数
         local function isVisible(pos, ignore)
-            if not wallCheckEnabled or wallPenetration then
-                -- 关闭墙体检测或开启穿墙时始终返回可见
-                return true
-            end
+            if not wallCheck then return true end
             
-            -- 正常检测
             local origin = Camera.CFrame.Position
             local direction = (pos - origin).Unit
             local ray = Ray.new(origin, direction * (origin - pos).Magnitude)
@@ -439,198 +562,94 @@
             return part == nil or part:IsDescendantOf(LocalPlayer.Character)
         end
         
-        -- 判定是否在任一 FOV
-        local function inAnyFOV(worldPos)
-            local screenPos = Camera:WorldToViewportPoint(worldPos)
-            if screenPos.Z <= 0 then return false end
+        -- 获取最近目标 (修复玩家不动时不瞄准的问题)
+        local function getClosest()
+            if not LocalPlayer.Character then return nil end
             
+            local closestPlayer = nil
+            local closestDistance = math.huge
+            local closestAngle = math.huge
             local mousePos = UserInputService:GetMouseLocation()
-            local center = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
+            local cameraCenter = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
             
-            -- 跟随圆
-            if mouseFovCircle.Visible then
-                if (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude <= mouseFOV then
-                    return true
-                end
-            end
-            
-            -- 固定圆
-            if fixedFovCircle.Visible then
-                if (Vector2.new(screenPos.X, screenPos.Y) - center).Magnitude <= fixedFOV then
-                    return true
-                end
-            end
-            
-            return false
-        end
-        
-        -- NPC缓存优化
-        local npcCache = {}
-        local lastNPCCacheUpdate = 0
-        local npcCacheUpdateInterval = 2.0 -- 2秒更新一次NPC缓存
-        
-        -- 获取所有目标（玩家和NPC）
-        local function getTargets()
-            local targets = {}
-            
-            -- 玩家目标
-            for _, plr in ipairs(Players:GetPlayers()) do
-                if plr == LocalPlayer then continue end
-                if aimbotCheckTeam and plr.Team and plr.Team == LocalPlayer.Team then continue end
-                
-                local char = plr.Character
-                if not char then continue end
-                
-                local aimPos = getAimPos(char)
-                if not aimPos then continue end
-                
-                -- 距离检查
-                local distance = (aimPos - Camera.CFrame.Position).Magnitude
-                if distance > aimbotMaxDistance then continue end
-                
-                if not inAnyFOV(aimPos) then continue end
-                
-                local ignoreList = {LocalPlayer.Character, Camera}
-                if not isVisible(aimPos, ignoreList) then continue end
-                
-                local sp = Camera:WorldToViewportPoint(aimPos)
-                if sp.Z <= 0 then continue end
-                
-                table.insert(targets, {
-                    type = "Player",
-                    object = plr,
-                    character = char,
-                    aimPos = aimPos,
-                    screenPos = Vector2.new(sp.X, sp.Y),
-                    distance = distance
-                })
-            end
-            
-            -- NPC目标（如果启用）
-            if aimbotTargetNPCs then
-                -- 更新NPC缓存
-                local now = tick()
-                if now - lastNPCCacheUpdate > npcCacheUpdateInterval then
-                    npcCache = {}
-                    for _, model in ipairs(workspace:GetChildren()) do
-                        if model:IsA("Model") and model:FindFirstChildOfClass("Humanoid") and not Players:GetPlayerFromCharacter(model) then
-                            local root = model:FindFirstChild("HumanoidRootPart") or model:FindFirstChild("Torso")
-                            local head = model:FindFirstChild("Head")
-                            
-                            if root and head then
-                                table.insert(npcCache, model)
-                            end
-                        end
+            for _, player in ipairs(Players:GetPlayers()) do
+                if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Humanoid") and player.Character.Humanoid.Health > 0 then
+                    if aimbotCheckTeam and player.Team == LocalPlayer.Team then
+                        continue
                     end
-                    lastNPCCacheUpdate = now
-                end
-                
-                -- 从缓存中获取NPC
-                for _, model in ipairs(npcCache) do
-                    if not model.Parent then continue end
                     
-                    local root = model:FindFirstChild("HumanoidRootPart") or model:FindFirstChild("Torso")
-                    local head = model:FindFirstChild("Head")
-                    if not (root and head) then continue end
-                    
-                    local aimPos = getAimPos(model)
+                    local aimPos = getAimPos(player.Character)
                     if not aimPos then continue end
                     
-                    -- 距离检查
-                    local distance = (aimPos - Camera.CFrame.Position).Magnitude
-                    if distance > aimbotMaxDistance then continue end
+                    if not isVisible(aimPos, {LocalPlayer.Character, player.Character}) then
+                        continue
+                    end
                     
-                    if not inAnyFOV(aimPos) then continue end
+                    local screenPos, onScreen = Camera:WorldToViewportPoint(aimPos)
+                    if not onScreen then continue end
                     
-                    local ignoreList = {LocalPlayer.Character, Camera}
-                    if not isVisible(aimPos, ignoreList) then continue end
+                    local screenVec = Vector2.new(screenPos.X, screenPos.Y)
                     
-                    local sp = Camera:WorldToViewportPoint(aimPos)
-                    if sp.Z <= 0 then continue end
-                    
-                    table.insert(targets, {
-                        type = "NPC",
-                        object = model,
-                        character = model,
-                        aimPos = aimPos,
-                        screenPos = Vector2.new(sp.X, sp.Y),
-                        distance = distance
-                    })
-                end
-            end
-            
-            return targets
-        end
-        
-        -- 取最近目标（以固定中心为基准）
-        local function getClosest()
-            local closest, minDist = nil, math.huge
-            local center = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
-            
-            for _, target in ipairs(getTargets()) do
-                local dist = (target.screenPos - center).Magnitude
-                if dist < minDist then
-                    minDist, closest = dist, target
-                end
-            end
-            
-            return closest
-        end
-        
-        -- 绕过服务器检测的Silent Aim
-        local function startSilentAim()
-            if silentAimConn then return end
-            
-            -- 保存原始函数
-            local oldNamecall
-            oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
-                local args = {...}
-                local method = getnamecallmethod()
-                
-                -- 绕过射击检测
-                if method == "FireServer" and (self.Name == "RemoteEvent" or self.Name == "Shoot") then
-                    local target = getClosest()
-                    if target and target.character then
-                        -- 修改射击位置为目标位置
-                        args[1] = target.aimPos
-                        return oldNamecall(self, unpack(args))
+                    if aimbotMode == "Distance" then
+                        -- 距离模式
+                        local distance = (mousePos - screenVec).Magnitude
+                        if distance < closestDistance then
+                            closestDistance = distance
+                            closestPlayer = player
+                        end
+                    else
+                        -- 准心模式
+                        local angle = (cameraCenter - screenVec).Magnitude
+                        if angle < closestAngle then
+                            closestAngle = angle
+                            closestPlayer = player
+                        end
                     end
                 end
-                
-                return oldNamecall(self, ...)
-            end)
+            end
             
-            silentAimConn = RunService.RenderStepped:Connect(function()
-                if not silentAimEnabled then 
-                    silentAimConn:Disconnect()
-                    silentAimConn = nil
-                    return 
-                end
-                
-                -- 更新跟随圆
-                mouseFovCircle.Position = UserInputService:GetMouseLocation()
-                
-                local target = getClosest()
-                if not target or not target.character then return end
-            end)
+            return closestPlayer
         end
         
         -- 主循环（带防瞬甩）
         local function startAimbot()
             if aimbotConn then return end
             
-            aimbotConn = RunService.RenderStepped:Connect(function()
-                if not aimbotEnabled then return end
+            aimbotConn = game:GetService("RunService").RenderStepped:Connect(function()
+                if not aimbotEnabled then 
+                    aimLine.Visible = false
+                    return 
+                end
                 
                 -- 更新跟随圆
                 mouseFovCircle.Position = UserInputService:GetMouseLocation()
         
                 local target = getClosest()
-                if not target or not target.character then return end
+                if not target or not target.Character then 
+                    aimLine.Visible = false
+                    return 
+                end
                 
-                local aimPos = target.aimPos
-                if not aimPos then return end
+                local aimPos = getAimPos(target.Character)
+                if not aimPos then 
+                    aimLine.Visible = false
+                    return 
+                end
         
+                -- 更新自瞄线条
+                if showAimLine then
+                    local screenPos, onScreen = Camera:WorldToViewportPoint(aimPos)
+                    if onScreen then
+                        aimLine.From = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
+                        aimLine.To = Vector2.new(screenPos.X, screenPos.Y)
+                        aimLine.Visible = true
+                    else
+                        aimLine.Visible = false
+                    end
+                else
+                    aimLine.Visible = false
+                end
+                
                 -- 安全 + 角度限制
                 local delta = aimPos - Camera.CFrame.Position
                 if delta.Magnitude < 0.1 then return end
@@ -665,18 +684,10 @@
             end
             mouseFovCircle.Visible = false
             fixedFovCircle.Visible = false
+            aimLine.Visible = false
         end
         
-        local function stopSilentAim()
-            if silentAimConn then 
-                silentAimConn:Disconnect() 
-                silentAimConn = nil 
-            end
-        end
-        
-        -----------------------------------------------------------------
         -- UI 构建
-        -----------------------------------------------------------------
         local aimbotSec = Tab4:AddSection({Name = "AI-Aimbot"})
         aimbotSec:AddToggle({
             Name = "启用 Aimbot",
@@ -690,42 +701,44 @@
                 end
             end
         })
-        
-        aimbotSec:AddToggle({
-            Name = "启用 Silent Aim",
-            Default = false,
-            Callback = function(v)
-                silentAimEnabled = v
-                if v then 
-                    startSilentAim() 
-                else 
-                    stopSilentAim() 
-                end
-            end
-        })
-        
         aimbotSec:AddToggle({
             Name = "仅瞄准敌人",
             Default = aimbotCheckTeam,
             Callback = function(v) aimbotCheckTeam = v end
         })
-        
-        aimbotSec:AddToggle({
-            Name = "瞄准NPC",
-            Default = aimbotTargetNPCs,
-            Callback = function(v) aimbotTargetNPCs = v end
-        })
-        
         aimbotSec:AddToggle({
             Name = "墙体检测",
-            Default = wallCheckEnabled,
-            Callback = function(v) wallCheckEnabled = v end
+            Default = wallCheck,
+            Callback = function(v) wallCheck = v end
+        })
+        aimbotSec:AddToggle({
+            Name = "显示自瞄线条",
+            Default = showAimLine,
+            Callback = function(v) showAimLine = v end
+        })
+        aimbotSec:AddDropdown({
+            Name = "瞄准模式",
+            Default = aimbotMode,
+            Options = {"Distance", "Angle"},
+            Callback = function(v) aimbotMode = v end
         })
         
-        aimbotSec:AddToggle({
-            Name = "子弹穿墙",
-            Default = wallPenetration,
-            Callback = function(v) wallPenetration = v end
+        local espSec = Tab4:AddSection({Name = "ESP设置"})
+        espSec:AddToggle({
+            Name = "启用ESP方框",
+            Default = espEnabled,
+            Callback = function(v) 
+                espEnabled = v 
+                if not v then
+                    clearEsp()
+                end
+            end
+        })
+        espSec:AddDropdown({
+            Name = "线条起点",
+            Default = espOrigin,
+            Options = {"Top", "Bottom"},
+            Callback = function(v) espOrigin = v end
         })
         
         local mouseSec = Tab4:AddSection({Name = "跟随鼠标 FOV"})
@@ -745,7 +758,6 @@
         commonSec:AddTextbox({ Name = "预测 (秒)（输入）", Default = tostring(aimbotPrediction), Callback = function(txt) local n = tonumber(txt) if n then aimbotPrediction = n; predSlider:Set(n) end end })
         local delaySlider = commonSec:AddSlider({ Name = "开火延迟 (秒)（滑条）", Min = 0, Max = 1, Default = aimbotDelay, Increment = 0.01, Callback = function(v) aimbotDelay = v end })
         commonSec:AddTextbox({ Name = "开火延迟 (秒)（输入）", Default = tostring(aimbotDelay), Callback = function(txt) local n = tonumber(txt) if n then aimbotDelay = n; delaySlider:Set(n) end end })
-        commonSec:AddSlider({ Name = "最大瞄准距离", Min = 0, Max = 5000, Default = aimbotMaxDistance, Increment = 50, Callback = function(v) aimbotMaxDistance = v end })
         commonSec:AddDropdown({ Name = "瞄准骨骼", Default = aimbotBone, Options = {"Head","Neck","UpperTorso","HumanoidRootPart"}, Callback = function(v) aimbotBone = v end })
         
         
@@ -756,7 +768,9 @@
             Name = "删除阴影",
             Default = false,
             Callback = function(v)
-                game.Lighting.GlobalShadows = not v
+                if game.Lighting then
+                    game.Lighting.GlobalShadows = not v
+                end
                 for _, l in ipairs(workspace:GetDescendants()) do
                     if l:IsA("BasePart") or l:IsA("MeshPart") then
                         l.CastShadow = not v
@@ -767,7 +781,7 @@
         })
 
         -----------------------------------------------------------------
-        -- 优化后的飞行功能
+        -- 优化后的飞行功能 (修复bug并提高流畅度)
         -----------------------------------------------------------------
         local flying = false
         local flySpeed = 50
@@ -775,9 +789,9 @@
         local ctrl = {f = 0, b = 0, l = 0, r = 0, u = 0, d = 0}
         local flyConnection
         
-        -- 飞行循环
+        -- 更流畅的飞行循环
         local function flyLoop()
-            while flying and RunService.Heartbeat:Wait() do
+            while flying and task.wait() do
                 local character = game.Players.LocalPlayer.Character
                 if not character then break end
                 
@@ -803,7 +817,7 @@
                                 (cameraRightVector * moveDirection.X * flySpeed) +
                                 (cameraUpVector * moveDirection.Y * flySpeed)
                 
-                bv.Velocity = velocity
+                if bv then bv.Velocity = velocity end
             end
         end
         
@@ -865,7 +879,7 @@
             })
             
             -- 启动飞行循环
-            flyConnection = RunService.Heartbeat:Connect(flyLoop)
+            flyConnection = task.spawn(flyLoop)
         end
         
         local function stopFlying()
@@ -875,7 +889,7 @@
             -- 清理飞行组件
             if bg then bg:Destroy() end
             if bv then bv:Destroy() end
-            if flyConnection then flyConnection:Disconnect() end
+            if flyConnection then task.cancel(flyConnection) end
             
             -- 恢复角色状态
             local character = game.Players.LocalPlayer.Character
@@ -883,11 +897,6 @@
                 local humanoid = character:FindFirstChildOfClass("Humanoid")
                 if humanoid then
                     humanoid.PlatformStand = false
-                end
-                
-                local animate = character:FindFirstChild("Animate")
-                if animate then
-                    animate.Disabled = false
                 end
             end
             
@@ -923,7 +932,7 @@
                     ctrl.r = 1
                 elseif input.KeyCode == Enum.KeyCode.Space then
                     ctrl.u = 1
-                elseif input.KeyCode == Enum.KeyCode.LeftControl or input.KeyCode == Enum.KeyCode.ButtonL3 then
+                elseif input.KeyCode == Enum.KeyCode.LeftControl then
                     ctrl.d = 1
                 end
             end)
@@ -942,14 +951,14 @@
                     ctrl.r = 0
                 elseif input.KeyCode == Enum.KeyCode.Space then
                     ctrl.u = 0
-                elseif input.KeyCode == Enum.KeyCode.LeftControl or input.KeyCode == Enum.KeyCode.ButtonL3 then
+                elseif input.KeyCode == Enum.KeyCode.LeftControl then
                     ctrl.d = 0
                 end
             end)
         end
         
         -- 角色死亡时自动停止飞行
-        game.Players.LocalPlayer.CharacterAdded:Connect(function()
+        Players.LocalPlayer.CharacterAdded:Connect(function()
             stopFlying()
         end)
         
@@ -991,425 +1000,11 @@
         flySection:AddLabel("W/A/S/D - 前后左右移动")
         flySection:AddLabel("空格键 - 向上飞行")
         flySection:AddLabel("Ctrl键 - 向下飞行")        
-        
-        -----------------------------------------------------------------
-        -- 增强版玩家 ESP（含队伍检测、距离、血条和可见性） - 优化版
-        -----------------------------------------------------------------
-        local espEnabled = false
-        local espCache = {}
-        local espUpdateInterval = 0.1 -- 优化：降低ESP更新频率
-        local lastESPUpdate = 0
-        
-        -- 获取队伍颜色
-        local function getTeamColor(plr)
-            if plr.Team and LocalPlayer.Team and plr.Team == LocalPlayer.Team then
-                return Color3.fromRGB(0, 255, 0) -- 队友绿色
-            else
-                return Color3.fromRGB(255, 0, 0) -- 敌人红色
-            end
-        end
-        
-        -- 创建ESP对象
-        local function createESPObject(plr)
-            local esp = {
-                Box = Drawing.new("Quad"),
-                Name = Drawing.new("Text"),
-                Distance = Drawing.new("Text"),
-                HealthBar = Drawing.new("Quad"),
-                HealthText = Drawing.new("Text")
-            }
-            
-            -- 设置初始属性
-            esp.Box.Thickness = 1.5
-            esp.Box.Filled = false
-            esp.Box.ZIndex = 5
-            
-            esp.Name.Size = 18
-            esp.Name.Center = true
-            esp.Name.Outline = true
-            esp.Name.ZIndex = 6
-            
-            esp.Distance.Size = 16
-            esp.Distance.Center = true
-            esp.Distance.Outline = true
-            esp.Distance.ZIndex = 6
-            
-            esp.HealthBar.Filled = true
-            esp.HealthBar.Thickness = 1
-            esp.HealthBar.ZIndex = 5
-            
-            esp.HealthText.Size = 14
-            esp.HealthText.Center = true
-            esp.HealthText.Outline = true
-            esp.HealthText.ZIndex = 6
-            
-            espCache[plr] = esp
-            return esp
-        end
-        
-        -- 更新ESP
-        local function updateESP()
-            if not espEnabled then return end
-            
-            for _, plr in ipairs(Players:GetPlayers()) do
-                if plr == LocalPlayer then continue end
-                
-                local char = plr.Character
-                if not char then
-                    if espCache[plr] then
-                        for _, obj in pairs(espCache[plr]) do
-                            obj.Visible = false
-                        end
-                    end
-                    continue end
-                
-                local root = char:FindFirstChild("HumanoidRootPart")
-                local head = char:FindFirstChild("Head")
-                local humanoid = char:FindFirstChildOfClass("Humanoid")
-                
-                if not (root and head and humanoid) then continue end
-                
-                -- 获取屏幕位置
-                local rootPos, rootVis = Camera:WorldToViewportPoint(root.Position)
-                local headPos, headVis = Camera:WorldToViewportPoint(head.Position + Vector3.new(0, 1.5, 0))
-                
-                if not (rootVis and headVis) then
-                    if espCache[plr] then
-                        for _, obj in pairs(espCache[plr]) do
-                            obj.Visible = false
-                        end
-                    end
-                    continue
-                end
-                
-                -- 创建或获取ESP对象
-                local esp = espCache[plr] or createESPObject(plr)
-                
-                -- 计算尺寸
-                local height = math.abs(headPos.Y - rootPos.Y) * 1.5
-                local width = height * 0.6
-                local left = headPos.X - width / 2
-                local right = headPos.X + width / 2
-                
-                -- 设置颜色
-                local color = getTeamColor(plr)
-                
-                -- 更新方框
-                esp.Box.Visible = true
-                esp.Box.Color = color
-                esp.Box.PointA = Vector2.new(left, headPos.Y)
-                esp.Box.PointB = Vector2.new(right, headPos.Y)
-                esp.Box.PointC = Vector2.new(right, headPos.Y + height)
-                esp.Box.PointD = Vector2.new(left, headPos.Y + height)
-                
-                -- 更新名字
-                esp.Name.Visible = true
-                esp.Name.Color = color
-                esp.Name.Position = Vector2.new(headPos.X, headPos.Y - 20)
-                esp.Name.Text = plr.Name
-                
-                -- 更新距离
-                local distance = math.floor((root.Position - Camera.CFrame.Position).Magnitude)
-                esp.Distance.Visible = true
-                esp.Distance.Color = color
-                esp.Distance.Position = Vector2.new(headPos.X, headPos.Y + height + 5)
-                esp.Distance.Text = tostring(distance) .. "m"
-                
-                -- 更新血条
-                local healthPercent = math.clamp(humanoid.Health / humanoid.MaxHealth, 0, 1)
-                local barWidth = width
-                local barHeight = 5
-                local barX = left
-                local barY = headPos.Y + height + 20
-                
-                esp.HealthBar.Visible = true
-                esp.HealthBar.Color = Color3.new(1 - healthPercent, healthPercent, 0)
-                esp.HealthBar.PointA = Vector2.new(barX, barY)
-                esp.HealthBar.PointB = Vector2.new(barX + barWidth * healthPercent, barY)
-                esp.HealthBar.PointC = Vector2.new(barX + barWidth * healthPercent, barY + barHeight)
-                esp.HealthBar.PointD = Vector2.new(barX, barY + barHeight)
-                
-                -- 更新血量文本
-                esp.HealthText.Visible = true
-                esp.HealthText.Color = Color3.new(1, 1, 1)
-                esp.HealthText.Position = Vector2.new(barX + barWidth / 2, barY - 10)
-                esp.HealthText.Text = math.floor(humanoid.Health) .. "/" .. math.floor(humanoid.MaxHealth)
-            end
-            
-            -- 清理不存在的玩家ESP
-            for plr, esp in pairs(espCache) do
-                if not plr or not plr.Parent or plr == LocalPlayer then
-                    for _, obj in pairs(esp) do
-                        obj.Visible = false
-                        obj:Remove()
-                    end
-                    espCache[plr] = nil
-                end
-            end
-        end
-        
-        -- 启动ESP循环
-        local espLoop
-        Tab4:AddToggle({
-            Name = "增强玩家 ESP", 
-            Default = false, 
-            Callback = function(v)
-                espEnabled = v
-                if v then
-                    if not espLoop then
-                        espLoop = RunService.RenderStepped:Connect(function()
-                            local now = tick()
-                            if now - lastESPUpdate > espUpdateInterval then
-                                updateESP()
-                                lastESPUpdate = now
-                            end
-                        end)
-                    end
-                else
-                    if espLoop then
-                        espLoop:Disconnect()
-                        espLoop = nil
-                    end
-                    -- 清理缓存
-                    for plr, esp in pairs(espCache) do
-                        for _, obj in pairs(esp) do
-                            pcall(function() obj:Remove() end)
-                        end
-                    end
-                    table.clear(espCache)
-                end
-            end
-        })
-        
-        -----------------------------------------------------------------
-        -- NPC 透视（增强版） - 优化版
-        -----------------------------------------------------------------
-        local npcEspEnabled = false
-        local npcEspCache = {}
-        local npcEspUpdateInterval = 0.15 -- 优化：降低NPC ESP更新频率
-        local lastNPCESPUpdate = 0
-        
-        -- 创建NPC ESP对象
-        local function createNpcESPObject(model)
-            local esp = {
-                Box = Drawing.new("Quad"),
-                Name = Drawing.new("Text"),
-                Distance = Drawing.new("Text")
-            }
-            
-            -- 设置初始属性
-            esp.Box.Thickness = 1.5
-            esp.Box.Filled = false
-            esp.Box.Color = Color3.fromRGB(255, 165, 0)
-            esp.Box.ZIndex = 4
-            
-            esp.Name.Size = 16
-            esp.Name.Center = true
-            esp.Name.Outline = true
-            esp.Name.Color = Color3.fromRGB(255, 165, 0)
-            esp.Name.ZIndex = 4
-            
-            esp.Distance.Size = 14
-            esp.Distance.Center = true
-            esp.Distance.Outline = true
-            esp.Distance.Color = Color3.fromRGB(255, 165, 0)
-            esp.Distance.ZIndex = 4
-            
-            npcEspCache[model] = esp
-            return esp
-        end
-        
-        -- 更新NPC ESP
-        local function updateNpcESP()
-            if not npcEspEnabled then return end
-            
-            for _, model in ipairs(npcCache) do
-                if not model.Parent then
-                    if npcEspCache[model] then
-                        for _, obj in pairs(npcEspCache[model]) do
-                            obj.Visible = false
-                        end
-                    end
-                    continue
-                end
-                
-                local root = model:FindFirstChild("HumanoidRootPart") or model:FindFirstChild("Torso")
-                local head = model:FindFirstChild("Head")
-                
-                if not (root and head) then
-                    if npcEspCache[model] then
-                        for _, obj in pairs(npcEspCache[model]) do
-                            obj.Visible = false
-                        end
-                    end
-                    continue
-                end
-                
-                -- 获取屏幕位置
-                local rootPos, rootVis = Camera:WorldToViewportPoint(root.Position)
-                local headPos, headVis = Camera:WorldToViewportPoint(head.Position + Vector3.new(0, 1.5, 0))
-                
-                if not (rootVis and headVis) then
-                    if npcEspCache[model] then
-                        for _, obj in pairs(npcEspCache[model]) do
-                            obj.Visible = false
-                        end
-                    end
-                    continue
-                end
-                
-                -- 创建或获取NPC ESP对象
-                local esp = npcEspCache[model] or createNpcESPObject(model)
-                
-                -- 计算尺寸
-                local height = math.abs(headPos.Y - rootPos.Y) * 1.5
-                local width = height * 0.6
-                local left = headPos.X - width / 2
-                local right = headPos.X + width / 2
-                
-                -- 更新方框
-                esp.Box.Visible = true
-                esp.Box.PointA = Vector2.new(left, headPos.Y)
-                esp.Box.PointB = Vector2.new(right, headPos.Y)
-                esp.Box.PointC = Vector2.new(right, headPos.Y + height)
-                esp.Box.PointD = Vector2.new(left, headPos.Y + height)
-                
-                -- 更新名字
-                esp.Name.Visible = true
-                esp.Name.Position = Vector2.new(headPos.X, headPos.Y - 15)
-                esp.Name.Text = model.Name
-                
-                -- 更新距离
-                local distance = math.floor((root.Position - Camera.CFrame.Position).Magnitude)
-                esp.Distance.Visible = true
-                esp.Distance.Position = Vector2.new(headPos.X, headPos.Y + height + 5)
-                esp.Distance.Text = tostring(distance) .. "m"
-            end
-            
-            -- 清理不存在的NPC ESP
-            for model, esp in pairs(npcEspCache) do
-                if not model or not model.Parent then
-                    for _, obj in pairs(esp) do
-                        obj.Visible = false
-                        obj:Remove()
-                    end
-                    npcEspCache[model] = nil
-                end
-            end
-        end
-        
-        -- 启动NPC ESP循环
-        local npcEspLoop
-        Tab4:AddToggle({
-            Name = "增强NPC透视", 
-            Default = false, 
-            Callback = function(v)
-                npcEspEnabled = v
-                if v then
-                    if not npcEspLoop then
-                        npcEspLoop = RunService.RenderStepped:Connect(function()
-                            local now = tick()
-                            if now - lastNPCESPUpdate > npcEspUpdateInterval then
-                                updateNpcESP()
-                                lastNPCESPUpdate = now
-                            end
-                        end)
-                    end
-                else
-                    if npcEspLoop then
-                        npcEspLoop:Disconnect()
-                        npcEspLoop = nil
-                    end
-                    -- 清理缓存
-                    for model, esp in pairs(npcEspCache) do
-                        for _, obj in pairs(esp) do
-                            pcall(function() obj:Remove() end)
-                        end
-                    end
-                    table.clear(npcEspCache)
-                end
-            end
-        })
-        
-        -----------------------------------------------------------------
-        -- 三锁定：移速 / 跳跃 / 重力
-        -----------------------------------------------------------------
-        local lockSpeed, lockJump, lockGrav = false, false, false
-        local savedSpeed, savedJump, savedGrav = 16, 50, 196
-        
-        local function applyValues()
-            local char = LocalPlayer.Character
-            if not char then return end
-            
-            local hum = char:FindFirstChildOfClass("Humanoid")
-            if not hum then return end
-            
-            if lockSpeed then hum.WalkSpeed = savedSpeed end
-            if lockJump then hum.JumpPower = savedJump end
-            if lockGrav then workspace.Gravity = savedGrav end
-        end
-        
-        LocalPlayer.CharacterAdded:Connect(function()
-            task.wait(0.5)
-            applyValues()
-        end)
-        
-        -- 输入框 + 开关
-        local lockSec = Tab4:AddSection({Name = "三锁定"})
-        lockSec:AddTextbox({
-            Name = "设定移速（仅保存值）", 
-            Default = tostring(savedSpeed), 
-            Callback = function(txt) 
-                savedSpeed = tonumber(txt) or 16 
-                applyValues()
-            end
-        })
-        lockSec:AddTextbox({
-            Name = "设定跳跃高度（仅保存值）", 
-            Default = tostring(savedJump), 
-            Callback = function(txt) 
-                savedJump = tonumber(txt) or 50 
-                applyValues()
-            end
-        })
-        lockSec:AddTextbox({
-            Name = "设定重力值（仅保存值）", 
-            Default = tostring(savedGrav), 
-            Callback = function(txt) 
-                savedGrav = tonumber(txt) or 196 
-                applyValues()
-            end
-        })
-        
-        lockSec:AddToggle({
-            Name = "锁定移速", 
-            Default = false, 
-            Callback = function(v) 
-                lockSpeed = v
-                applyValues()
-            end
-        })
-        lockSec:AddToggle({
-            Name = "锁定跳跃", 
-            Default = false, 
-            Callback = function(v) 
-                lockJump = v
-                applyValues()
-            end
-        })
-        lockSec:AddToggle({
-            Name = "锁定重力", 
-            Default = false, 
-            Callback = function(v) 
-                lockGrav = v
-                applyValues()
-            end
-        })
-        
-        -- 其他功能标签页
-        local Tab2 = Window:MakeTab({Name = "控制台", Icon = "rbxassetid://7733779610"})
-        Tab2:AddButton({Name = "控制台", Callback = function()
-            loadstring(game:HttpGet("https://raw.githubusercontent.com/yxgh165/yxgh165/blob/main/666"))()
+
+        -- 脚本中心
+        local Tab2 = Window:MakeTab({Name = "VR", Icon = "rbxassetid://7733779610"})
+        Tab2:AddButton({Name = "FEVR脚本", Callback = function()
+            loadstring(game:HttpGet("https://raw.githubusercontent.com/randomstring0/Qwerty/refs/heads/main/qwerty45.lua"))()
         end})
         
         local Tab3 = Window:MakeTab({Name = "XA脚本", Icon = "rbxassetid://7733779610"})
@@ -1457,24 +1052,26 @@
         SettingsTab:AddButton({
             Name = "清除卡密",
             Callback = function()
-                if isfile and isfile(KeySystem.KeyFile) then
+                if KeySystem.StorageMethod == "File" and isfile and isfile(KeySystem.KeyFile) then
                     delfile(KeySystem.KeyFile)
-                    OrionLib:MakeNotification({
-                        Name = "成功",
-                        Content = "卡密已清除，请重新验证",
-                        Time = 3
-                    })
-                    Window:Destroy()
-                    wait(1)
-                    ShowKeyWindow()
+                else
+                    getgenv().StitchSavedKey = nil
                 end
+                OrionLib:MakeNotification({
+                    Name = "成功",
+                    Content = "卡密已清除，请重新验证",
+                    Time = 3
+                })
+                Window:Destroy()
+                task.wait(1)
+                ShowKeyWindow()
             end
         })
         
         SettingsTab:AddLabel("卡密状态: " .. (KeySystem.CurrentKey and "已验证" or "未验证"))
         SettingsTab:AddLabel("当前卡密: " .. (KeySystem.CurrentKey or "无"))
+        SettingsTab:AddLabel("存储方式: " .. KeySystem.StorageMethod)
         
-        -- 添加一键复制卡密按钮
         SettingsTab:AddButton({
             Name = "一键复制当前卡密",
             Callback = function()
@@ -1491,7 +1088,6 @@
             end
         })
         
-        -- 添加一键复制Discord链接按钮
         SettingsTab:AddButton({
             Name = "一键复制Discord链接",
             Callback = function()
@@ -1515,26 +1111,13 @@
         CreateKunKunAnimation()
         
         -- 延迟后显示主窗口
-        wait(2.5)
+        task.wait(2.5)
         ShowMainWindow()
     else
-        -- 清除无效的已保存卡密
-        if isfile and isfile(KeySystem.KeyFile) then
-            delfile(KeySystem.KeyFile)
-        end
         ShowKeyWindow()
     end
     
-    -- 忍者注入器兼容性检查
-    if identifyexecutor and identifyexecutor():lower():find("ninja") then
-        OrionLib:MakeNotification({
-            Name = "注入器检测",
-            Content = "忍者注入器已识别，卡密系统已适配",
-            Time = 3
-        })
-    end
-    
-    -- 添加卡密管理命令（可选）
+    -- 添加卡密管理命令
     getgenv().SetKey = function(key)
         if VerifyKey(key) then
             KeySystem.CurrentKey = key
@@ -1555,14 +1138,16 @@
     end
     
     getgenv().ClearKey = function()
-        if isfile and isfile(KeySystem.KeyFile) then
+        if KeySystem.StorageMethod == "File" and isfile and isfile(KeySystem.KeyFile) then
             delfile(KeySystem.KeyFile)
-            KeySystem.IsVerified = false
-            OrionLib:MakeNotification({
-                Name = "成功",
-                Content = "卡密已清除",
-                Time = 2
-            })
+        else
+            getgenv().StitchSavedKey = nil
         end
+        KeySystem.IsVerified = false
+        OrionLib:MakeNotification({
+            Name = "成功",
+            Content = "卡密已清除",
+            Time = 2
+        })
     end
 end)()
