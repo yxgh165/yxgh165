@@ -902,7 +902,6 @@ end
         local espEnabled = false
         local espCache = {}
         local tracerPosition = "Bottom"  -- 线条位置: "Top" 或 "Bottom"
-        local boxLinePosition = "Top"    -- 方框线条位置: "Top" 或 "Bottom"
         
         -- 获取队伍颜色
         local function getTeamColor(plr)
@@ -921,8 +920,7 @@ end
                 Distance = Drawing.new("Text"),
                 HealthBar = Drawing.new("Quad"),
                 HealthText = Drawing.new("Text"),
-                Tracer = Drawing.new("Line"),  -- 新增线条
-                BoxLine = Drawing.new("Line")  -- 方框线条
+                Tracer = Drawing.new("Line")  -- 新增线条
             }
             
             -- 设置初始属性
@@ -951,9 +949,6 @@ end
             
             esp.Tracer.Thickness = 1.5  -- 线条粗细
             esp.Tracer.ZIndex = 4
-            
-            esp.BoxLine.Thickness = 1.5  -- 方框线条粗细
-            esp.BoxLine.ZIndex = 5
             
             espCache[plr] = esp
             return esp
@@ -1064,21 +1059,6 @@ end
                 
                 esp.Tracer.From = startPoint
                 esp.Tracer.To = endPoint
-                
-                -- 更新方框线条
-                esp.BoxLine.Visible = true
-                esp.BoxLine.Color = color
-                
-                -- 根据选择的位置设置方框线条
-                if boxLinePosition == "Top" then
-                    -- 从方框顶部中心到屏幕顶部中心
-                    esp.BoxLine.From = Vector2.new(headPos.X, headPos.Y)
-                    esp.BoxLine.To = Vector2.new(Camera.ViewportSize.X/2, 0)
-                else
-                    -- 从方框底部中心到屏幕底部中心
-                    esp.BoxLine.From = Vector2.new(headPos.X, headPos.Y + height)
-                    esp.BoxLine.To = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y)
-                end
             end
             
             -- 清理不存在的玩家ESP
@@ -1128,16 +1108,6 @@ end
             Options = {"Top", "Bottom"},
             Callback = function(value)
                 tracerPosition = value
-            end
-        })
-        
-        -- 添加方框线条位置选择
-        espSection:AddDropdown({
-            Name = "方框线条位置",
-            Default = boxLinePosition,
-            Options = {"Top", "Bottom"},
-            Callback = function(value)
-                boxLinePosition = value
             end
         })
         
@@ -1275,7 +1245,6 @@ end
                 end
             end
         })
-        
         -----------------------------------------------------------------
         -- ⑩ 三锁定：移速 / 跳跃 / 重力
         -----------------------------------------------------------------
