@@ -897,219 +897,247 @@ end
         flySection:AddLabel("Ctrl键 - 向下飞行")        
         
         -----------------------------------------------------------------
-        -- ⑧ 增强版玩家 ESP（含队伍检测、距离、血条和线条绘制）
-        -----------------------------------------------------------------
-        local espEnabled = false
-        local espCache = {}
-        local tracerPosition = "Bottom"  -- 线条位置: "Top" 或 "Bottom"
+-- ⑧ 增强版玩家 ESP（含队伍检测、距离、血条和线条绘制）
+-----------------------------------------------------------------
+local espEnabled = false
+local espCache = {}
+local tracerPosition = "Bottom"  -- 线条位置: "Top" 或 "Bottom"
+local espShowEnemyOnly = false  -- 新增：是否只显示敌人
+
+-- 获取队伍颜色
+local function getTeamColor(plr)
+    if plr.Team and LocalPlayer.Team and plr.Team == LocalPlayer.Team then
+        return Color3.fromRGB(0, 255, 0) -- 队友绿色
+    else
+        return Color3.fromRGB(255, 0, 0) -- 敌人红色
+    end
+end
+
+-- 检查是否为队友
+local function isTeammate(plr)
+    if plr.Team and LocalPlayer.Team and plr.Team == LocalPlayer.Team then
+        return true
+    end
+    return false
+end
+
+-- 创建ESP对象
+local function createESPObject(plr)
+    local esp = {
+        Box = Drawing.new("Quad"),
+        Name = Drawing.new("Text"),
+        Distance = Drawing.new("Text"),
+        HealthBar = Drawing.new("Quad"),
+        HealthText = Drawing.new("Text"),
+        Tracer = Drawing.new("Line")  -- 新增线条
+    }
+    
+    -- 设置初始属性
+    esp.Box.Thickness = 1.5
+    esp.Box.Filled = false
+    esp.Box.ZIndex = 5
+    
+    esp.Name.Size = 18
+    esp.Name.Center = true
+    esp.Name.Outline = true
+    esp.Name.ZIndex = 6
+    
+    esp.Distance.Size = 16
+    esp.Distance.Center = true
+    esp.Distance.Outline = true
+    esp.Distance.ZIndex = 6
+    
+    esp.HealthBar.Filled = true
+    esp.HealthBar.Thickness = 1
+    esp.HealthBar.ZIndex = 5
+    
+    esp.HealthText.Size = 14
+    esp.HealthText.Center = true
+    esp.HealthText.Outline = true
+    esp.HealthText.ZIndex = 6
+    
+    esp.Tracer.Thickness = 1.5  -- 线条粗细
+    esp.Tracer.ZIndex = 4
+    
+    espCache[plr] = esp
+    return esp
+end
+
+-- 更新ESP
+local function updateESP()
+    if not espEnabled then return end
+    
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr == LocalPlayer then continue end
         
-        -- 获取队伍颜色
-        local function getTeamColor(plr)
-            if plr.Team and LocalPlayer.Team and plr.Team == LocalPlayer.Team then
-                return Color3.fromRGB(0, 255, 0) -- 队友绿色
-            else
-                return Color3.fromRGB(255, 0, 0) -- 敌人红色
+        -- 如果开启了"只显示敌人"并且是队友，则跳过
+        if espShowEnemyOnly and isTeammate(plr) then
+            if espCache[plr] then
+                for _, obj in pairs(espCache[plr]) do
+                    obj.Visible = false
+                end
             end
+            continue
         end
         
-        -- 创建ESP对象
-        local function createESPObject(plr)
-            local esp = {
-                Box = Drawing.new("Quad"),
-                Name = Drawing.new("Text"),
-                Distance = Drawing.new("Text"),
-                HealthBar = Drawing.new("Quad"),
-                HealthText = Drawing.new("Text"),
-                Tracer = Drawing.new("Line")  -- 新增线条
-            }
-            
-            -- 设置初始属性
-            esp.Box.Thickness = 1.5
-            esp.Box.Filled = false
-            esp.Box.ZIndex = 5
-            
-            esp.Name.Size = 18
-            esp.Name.Center = true
-            esp.Name.Outline = true
-            esp.Name.ZIndex = 6
-            
-            esp.Distance.Size = 16
-            esp.Distance.Center = true
-            esp.Distance.Outline = true
-            esp.Distance.ZIndex = 6
-            
-            esp.HealthBar.Filled = true
-            esp.HealthBar.Thickness = 1
-            esp.HealthBar.ZIndex = 5
-            
-            esp.HealthText.Size = 14
-            esp.HealthText.Center = true
-            esp.HealthText.Outline = true
-            esp.HealthText.ZIndex = 6
-            
-            esp.Tracer.Thickness = 1.5  -- 线条粗细
-            esp.Tracer.ZIndex = 4
-            
-            espCache[plr] = esp
-            return esp
+        local char = plr.Character
+        if not char then
+            if espCache[plr] then
+                for _, obj in pairs(espCache[plr]) do
+                    obj.Visible = false
+                end
+            end
+            continue end
+        
+        local root = char:FindFirstChild("HumanoidRootPart")
+        local head = char:FindFirstChild("Head")
+        local humanoid = char:FindFirstChildOfClass("Humanoid")
+        
+        if not (root and head and humanoid) then continue end
+        
+        -- 获取屏幕位置
+        local rootPos, rootVis = Camera:WorldToViewportPoint(root.Position)
+        local headPos, headVis = Camera:WorldToViewportPoint(head.Position + Vector3.new(0, 1.5, 0))
+        
+        if not (rootVis and headVis) then
+            if espCache[plr] then
+                for _, obj in pairs(espCache[plr]) do
+                    obj.Visible = false
+                end
+            end
+            continue
         end
         
-        -- 更新ESP
-        local function updateESP()
-            if not espEnabled then return end
-            
-            for _, plr in ipairs(Players:GetPlayers()) do
-                if plr == LocalPlayer then continue end
-                
-                local char = plr.Character
-                if not char then
-                    if espCache[plr] then
-                        for _, obj in pairs(espCache[plr]) do
-                            obj.Visible = false
-                        end
-                    end
-                    continue end
-                
-                local root = char:FindFirstChild("HumanoidRootPart")
-                local head = char:FindFirstChild("Head")
-                local humanoid = char:FindFirstChildOfClass("Humanoid")
-                
-                if not (root and head and humanoid) then continue end
-                
-                -- 获取屏幕位置
-                local rootPos, rootVis = Camera:WorldToViewportPoint(root.Position)
-                local headPos, headVis = Camera:WorldToViewportPoint(head.Position + Vector3.new(0, 1.5, 0))
-                
-                if not (rootVis and headVis) then
-                    if espCache[plr] then
-                        for _, obj in pairs(espCache[plr]) do
-                            obj.Visible = false
-                        end
-                    end
-                    continue
-                end
-                
-                -- 创建或获取ESP对象
-                local esp = espCache[plr] or createESPObject(plr)
-                
-                -- 计算尺寸
-                local height = math.abs(headPos.Y - rootPos.Y) * 1.5
-                local width = height * 0.6
-                local left = headPos.X - width / 2
-                local right = headPos.X + width / 2
-                
-                -- 设置颜色
-                local color = getTeamColor(plr)
-                
-                -- 更新方框
-                esp.Box.Visible = true
-                esp.Box.Color = color
-                esp.Box.PointA = Vector2.new(left, headPos.Y)
-                esp.Box.PointB = Vector2.new(right, headPos.Y)
-                esp.Box.PointC = Vector2.new(right, headPos.Y + height)
-                esp.Box.PointD = Vector2.new(left, headPos.Y + height)
-                
-                -- 更新名字
-                esp.Name.Visible = true
-                esp.Name.Color = color
-                esp.Name.Position = Vector2.new(headPos.X, headPos.Y - 20)
-                esp.Name.Text = plr.Name
-                
-                -- 更新距离
-                local distance = math.floor((root.Position - Camera.CFrame.Position).Magnitude)
-                esp.Distance.Visible = true
-                esp.Distance.Color = color
-                esp.Distance.Position = Vector2.new(headPos.X, headPos.Y + height + 5)
-                esp.Distance.Text = tostring(distance) .. "m"
-                
-                -- 更新血条
-                local healthPercent = math.clamp(humanoid.Health / humanoid.MaxHealth, 0, 1)
-                local barWidth = width
-                local barHeight = 5
-                local barX = left
-                local barY = headPos.Y + height + 20
-                
-                esp.HealthBar.Visible = true
-                esp.HealthBar.Color = Color3.new(1 - healthPercent, healthPercent, 0)
-                esp.HealthBar.PointA = Vector2.new(barX, barY)
-                esp.HealthBar.PointB = Vector2.new(barX + barWidth * healthPercent, barY)
-                esp.HealthBar.PointC = Vector2.new(barX + barWidth * healthPercent, barY + barHeight)
-                esp.HealthBar.PointD = Vector2.new(barX, barY + barHeight)
-                
-                -- 更新血量文本
-                esp.HealthText.Visible = true
-                esp.HealthText.Color = Color3.new(1, 1, 1)
-                esp.HealthText.Position = Vector2.new(barX + barWidth / 2, barY - 10)
-                esp.HealthText.Text = math.floor(humanoid.Health) .. "/" .. math.floor(humanoid.MaxHealth)
-                
-                -- 更新线条
-                esp.Tracer.Visible = true
-                esp.Tracer.Color = color
-                
-                -- 根据选择的位置设置线条起点
-                local startPoint
-                if tracerPosition == "Top" then
-                    startPoint = Vector2.new(Camera.ViewportSize.X/2, 0)  -- 屏幕顶部中心
-                else
-                    startPoint = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y)  -- 屏幕底部中心
-                end
-                
-                -- 线条终点为玩家身体中心
-                local endPoint = Vector2.new(headPos.X, headPos.Y + height/2)
-                
-                esp.Tracer.From = startPoint
-                esp.Tracer.To = endPoint
+        -- 创建或获取ESP对象
+        local esp = espCache[plr] or createESPObject(plr)
+        
+        -- 计算尺寸
+        local height = math.abs(headPos.Y - rootPos.Y) * 1.5
+        local width = height * 0.6
+        local left = headPos.X - width / 2
+        local right = headPos.X + width / 2
+        
+        -- 设置颜色
+        local color = getTeamColor(plr)
+        
+        -- 更新方框
+        esp.Box.Visible = true
+        esp.Box.Color = color
+        esp.Box.PointA = Vector2.new(left, headPos.Y)
+        esp.Box.PointB = Vector2.new(right, headPos.Y)
+        esp.Box.PointC = Vector2.new(right, headPos.Y + height)
+        esp.Box.PointD = Vector2.new(left, headPos.Y + height)
+        
+        -- 更新名字
+        esp.Name.Visible = true
+        esp.Name.Color = color
+        esp.Name.Position = Vector2.new(headPos.X, headPos.Y - 20)
+        esp.Name.Text = plr.Name
+        
+        -- 更新距离
+        local distance = math.floor((root.Position - Camera.CFrame.Position).Magnitude)
+        esp.Distance.Visible = true
+        esp.Distance.Color = color
+        esp.Distance.Position = Vector2.new(headPos.X, headPos.Y + height + 5)
+        esp.Distance.Text = tostring(distance) .. "m"
+        
+        -- 更新血条
+        local healthPercent = math.clamp(humanoid.Health / humanoid.MaxHealth, 0, 1)
+        local barWidth = width
+        local barHeight = 5
+        local barX = left
+        local barY = headPos.Y + height + 20
+        
+        esp.HealthBar.Visible = true
+        esp.HealthBar.Color = Color3.new(1 - healthPercent, healthPercent, 0)
+        esp.HealthBar.PointA = Vector2.new(barX, barY)
+        esp.HealthBar.PointB = Vector2.new(barX + barWidth * healthPercent, barY)
+        esp.HealthBar.PointC = Vector2.new(barX + barWidth * healthPercent, barY + barHeight)
+        esp.HealthBar.PointD = Vector2.new(barX, barY + barHeight)
+        
+        -- 更新血量文本
+        esp.HealthText.Visible = true
+        esp.HealthText.Color = Color3.new(1, 1, 1)
+        esp.HealthText.Position = Vector2.new(barX + barWidth / 2, barY - 10)
+        esp.HealthText.Text = math.floor(humanoid.Health) .. "/" .. math.floor(humanoid.MaxHealth)
+        
+        -- 更新线条
+        esp.Tracer.Visible = true
+        esp.Tracer.Color = color
+        
+        -- 根据选择的位置设置线条起点
+        local startPoint
+        if tracerPosition == "Top" then
+            startPoint = Vector2.new(Camera.ViewportSize.X/2, 0)  -- 屏幕顶部中心
+        else
+            startPoint = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y)  -- 屏幕底部中心
+        end
+        
+        -- 线条终点为玩家身体中心
+        local endPoint = Vector2.new(headPos.X, headPos.Y + height/2)
+        
+        esp.Tracer.From = startPoint
+        esp.Tracer.To = endPoint
+    end
+    
+    -- 清理不存在的玩家ESP
+    for plr, esp in pairs(espCache) do
+        if not plr or not plr.Parent or plr == LocalPlayer then
+            for _, obj in pairs(esp) do
+                obj.Visible = false
+                obj:Remove()
             end
-            
-            -- 清理不存在的玩家ESP
+            espCache[plr] = nil
+        end
+    end
+end
+
+-- 启动ESP循环
+local espLoop
+local espSection = Tab4:AddSection({Name = "玩家透视"})
+espSection:AddToggle({
+    Name = "增强玩家 ESP", 
+    Default = false, 
+    Callback = function(v)
+        espEnabled = v
+        if v then
+            if not espLoop then
+                espLoop = game:GetService("RunService").RenderStepped:Connect(updateESP)
+            end
+        else
+            if espLoop then
+                espLoop:Disconnect()
+                espLoop = nil
+            end
+            -- 清理缓存
             for plr, esp in pairs(espCache) do
-                if not plr or not plr.Parent or plr == LocalPlayer then
-                    for _, obj in pairs(esp) do
-                        obj.Visible = false
-                        obj:Remove()
-                    end
-                    espCache[plr] = nil
+                for _, obj in pairs(esp) do
+                    pcall(function() obj:Remove() end)
                 end
             end
+            table.clear(espCache)
         end
-        
-        -- 启动ESP循环
-        local espLoop
-        local espSection = Tab4:AddSection({Name = "玩家透视"})
-        espSection:AddToggle({
-            Name = "增强玩家 ESP", 
-            Default = false, 
-            Callback = function(v)
-                espEnabled = v
-                if v then
-                    if not espLoop then
-                        espLoop = game:GetService("RunService").RenderStepped:Connect(updateESP)
-                    end
-                else
-                    if espLoop then
-                        espLoop:Disconnect()
-                        espLoop = nil
-                    end
-                    -- 清理缓存
-                    for plr, esp in pairs(espCache) do
-                        for _, obj in pairs(esp) do
-                            pcall(function() obj:Remove() end)
-                        end
-                    end
-                    table.clear(espCache)
-                end
-            end
-        })
-        
-        -- 添加线条位置选择
-        espSection:AddDropdown({
-            Name = "线条位置",
-            Default = tracerPosition,
-            Options = {"Top", "Bottom"},
-            Callback = function(value)
-                tracerPosition = value
-            end
-        })
+    end
+})
+
+-- 添加线条位置选择
+espSection:AddDropdown({
+    Name = "线条位置",
+    Default = tracerPosition,
+    Options = {"Top", "Bottom"},
+    Callback = function(value)
+        tracerPosition = value
+    end
+})
+
+-- 添加只显示敌人开关
+espSection:AddToggle({
+    Name = "只显示敌人",
+    Default = espShowEnemyOnly,
+    Callback = function(v)
+        espShowEnemyOnly = v
+    end
+})
         
         -----------------------------------------------------------------
         -- ⑨ NPC 透视（增强版）
