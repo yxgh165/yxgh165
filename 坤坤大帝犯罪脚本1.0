@@ -1,217 +1,796 @@
---[[  ===== 忍者注入器-NinjaInjector v1.0 =====  ]]
---  功能：1. 原地加载整套 GUI
---        2. 支持热键隐藏/显示（默认 RightShift）
---        3. 支持双击顶部拖动条快速最小化
---        4. 支持自动保存配置（本地）
---  用法：require(脚本) 即可，零配置
----------------------------------------------------
+-- NinjaUI - 专为Roblox忍者注入器设计的UI框架
+-- 作者: AI助手
+-- 版本: 1.2
+-- 日期: 2023-11-15
 
-local player = game:GetService("Players").LocalPlayer
-local UIS    = game:GetService("UserInputService")
-local TS     = game:GetService("TweenService")
-local Http   = game:GetService("HttpService")
+local NinjaUI = {}
+NinjaUI.__index = NinjaUI
 
--- 防止重复注入
-if player:FindFirstChild("__NINJA_MARKER") then return end
-local marker = Instance.new("BoolValue"); marker.Name = "__NINJA_MARKER"; marker.Parent = player
-
----------------------------------------------------
--- 1) 保存/读取本地配置
----------------------------------------------------
-local CONFIG = { minimised = false, visible = true }
-local CONFIG_NAME = "NinjaConfig.json"
-
-local function loadConfig()
-    local suc, data = pcall(function()
-        return Http:JSONDecode(readfile(CONFIG_NAME))
-    end)
-    if suc then
-        for k,v in pairs(data) do CONFIG[k]=v end
-    end
-end
-
-local function saveConfig()
-    writefile(CONFIG_NAME, Http:JSONEncode(CONFIG))
-end
-
--- 仅在支持文件系统的环境执行（Synapse, Script-Ware, KRNL…）
-if isfile and writefile then
-    loadConfig()
-end
-
----------------------------------------------------
--- 2) GUI 初始化
----------------------------------------------------
-local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "NinjaGui"
-screenGui.ResetOnSpawn = false
-screenGui.Parent = player:WaitForChild("PlayerGui")
-
-local mainFrame = Instance.new("Frame")
-mainFrame.Size = CONFIG.minimised and UDim2.new(0,0,0,0) or UDim2.new(0.4,0,0.6,0)
-mainFrame.Position = UDim2.new(0.5,0,0.5,0)
-mainFrame.AnchorPoint = Vector2.new(0.5,0.5)
-mainFrame.BackgroundTransparency = 0.3
-mainFrame.Parent = screenGui
-
-local g = Instance.new("UIGradient")
-g.Color = ColorSequence.new{
-    ColorSequenceKeypoint.new(0, Color3.fromRGB(255,0,128)),
-    ColorSequenceKeypoint.new(1, Color3.fromRGB(0,0,255))
+-- 主题颜色配置
+local Themes = {
+    Dark = {
+        Background = Color3.fromRGB(30, 30, 40),
+        Header = Color3.fromRGB(25, 25, 35),
+        Primary = Color3.fromRGB(100, 70, 200),
+        Secondary = Color3.fromRGB(80, 50, 180),
+        Text = Color3.fromRGB(240, 240, 240),
+        Border = Color3.fromRGB(60, 60, 80),
+        Shadow = Color3.fromRGB(15, 15, 20),
+        Success = Color3.fromRGB(80, 200, 120),
+        Warning = Color3.fromRGB(220, 170, 50),
+        Danger = Color3.fromRGB(220, 80, 80)
+    },
+    Light = {
+        Background = Color3.fromRGB(245, 245, 250),
+        Header = Color3.fromRGB(230, 230, 240),
+        Primary = Color3.fromRGB(100, 70, 200),
+        Secondary = Color3.fromRGB(80, 50, 180),
+        Text = Color3.fromRGB(40, 40, 50),
+        Border = Color3.fromRGB(200, 200, 210),
+        Shadow = Color3.fromRGB(180, 180, 190),
+        Success = Color3.fromRGB(70, 180, 100),
+        Warning = Color3.fromRGB(200, 150, 40),
+        Danger = Color3.fromRGB(200, 70, 70)
+    },
+    Ocean = {
+        Background = Color3.fromRGB(25, 35, 50),
+        Header = Color3.fromRGB(20, 30, 45),
+        Primary = Color3.fromRGB(50, 150, 200),
+        Secondary = Color3.fromRGB(40, 130, 180),
+        Text = Color3.fromRGB(230, 240, 250),
+        Border = Color3.fromRGB(40, 60, 80),
+        Shadow = Color3.fromRGB(15, 25, 35),
+        Success = Color3.fromRGB(70, 200, 170),
+        Warning = Color3.fromRGB(220, 180, 70),
+        Danger = Color3.fromRGB(220, 100, 100)
+    }
 }
-g.Rotation = 45
-g.Parent = mainFrame
 
-Instance.new("UICorner").Parent = mainFrame
-
--- 拖动条（双击最小化）
-local dragBar = Instance.new("TextButton")
-dragBar.Size = UDim2.new(1,0,0,20)
-dragBar.BackgroundTransparency = 1
-dragBar.Text = ""
-dragBar.Parent = mainFrame
-MakeDraggable(mainFrame, dragBar)
-
--- 双击最小化
-local lastClick = 0
-dragBar.MouseButton1Click:Connect(function()
-    local now = tick()
-    if now - lastClick < 0.3 then
-        toggleMinimise()
-    end
-    lastClick = now
-end)
-
----------------------------------------------------
--- 3) 侧边栏 & 页面（沿用你原本逻辑，精简）
----------------------------------------------------
-local buttonsFrame = Instance.new("Frame")
-buttonsFrame.Size = UDim2.new(0.25,0,0.9,0)
-buttonsFrame.Position = UDim2.new(0.02,0,0.05,0)
-buttonsFrame.BackgroundTransparency = 0.5
-buttonsFrame.Visible = not CONFIG.minimised
-buttonsFrame.Parent = mainFrame
-Instance.new("UICorner").Parent = buttonsFrame)
-
-local list = Instance.new("UIListLayout")
-list.Parent = buttonsFrame
-list.Padding = UDim.new(0.05,0)
-
-local pages = {}
-local currentPage
-
-local buttonTexts = {"公告","绘制","功能","杂项"}
-
--- 创建页面函数
-local function createPage(name)
-    local p = Instance.new("Frame")
-    p.Name = name
-    p.Size = UDim2.new(0.7,0,0.8,0)
-    p.Position = UDim2.new(0.28,0,0.1,0)
-    p.BackgroundTransparency = 0.5
-    p.BackgroundColor3 = Color3.new(1,1,1)
-    p.Visible = false
-    p.Parent = mainFrame
-    Instance.new("UICorner").Parent = p
-
-    -- ScrollingFrame 示例
-    local sf = Instance.new("ScrollingFrame")
-    sf.Size = UDim2.new(1,0,0.8,0)
-    sf.BackgroundTransparency = 1
-    sf.ScrollBarThickness = 5
-    sf.CanvasSize = UDim2.new(0,0,2,0)
-    sf.Parent = p
-
-    for i=1,10 do
-        local lb = Instance.new("TextLabel")
-        lb.Size = UDim2.new(1,0,0.1,0)
-        lb.Position = UDim2.new(0,0,0.1*(i-1),0)
-        lb.BackgroundTransparency = 1
-        lb.Text = name.." 内容 "..i
-        lb.TextColor3 = Color3.new(0,0,0)
-        lb.Font = Enum.Font.SourceSansBold
-        lb.TextSize = 16
-        lb.Parent = sf
-    end
-
-    return p
+-- 创建圆角矩形函数
+local function RoundedRectangle(position, size, cornerRadius, color, filled)
+    local rectangle = Drawing.new("Square")
+    rectangle.Position = position
+    rectangle.Size = size
+    rectangle.Color = color
+    rectangle.Filled = filled
+    rectangle.Thickness = 0
+    return rectangle
 end
 
--- 初始化
-for _,txt in ipairs(buttonTexts) do
-    pages[txt] = createPage(txt)
-    local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0.9,0,0.12,0)
-    btn.Text = txt
-    btn.BackgroundColor3 = Color3.fromRGB(0,0,0)
-    btn.BackgroundTransparency = 0.5
-    btn.TextColor3 = Color3.new(1,1,1)
-    btn.Font = Enum.Font.SourceSansBold
-    btn.TextSize = 16
-    btn.Parent = buttonsFrame
-    Instance.new("UICorner").Parent = btn
-    btn.MouseButton1Click:Connect(function()
-        if currentPage then currentPage.Visible=false end
-        pages[txt].Visible = true
-        currentPage = pages[txt]
+-- 创建阴影效果
+local function AddShadow(element, theme)
+    local shadow = RoundedRectangle(
+        Vector2.new(element.Position.X + 3, element.Position.Y + 3),
+        element.Size,
+        5,
+        theme.Shadow,
+        true
+    )
+    shadow.ZIndex = element.ZIndex - 1
+    return shadow
+end
+
+-- 创建窗口
+function NinjaUI:CreateWindow(title, size, position, themeName)
+    local window = {}
+    setmetatable(window, NinjaUI)
+    
+    -- 设置主题
+    themeName = themeName or "Dark"
+    window.Theme = Themes[themeName] or Themes.Dark
+    
+    -- 窗口属性
+    window.Title = title or "NinjaUI Window"
+    window.Size = size or Vector2.new(400, 500)
+    window.Position = position or Vector2.new(100, 100)
+    window.Visible = true
+    window.Active = true
+    window.Tabs = {}
+    window.CurrentTab = nil
+    window.Elements = {}
+    window.ZIndex = 10
+    window.Dragging = false
+    window.DragOffset = Vector2.new(0, 0)
+    
+    -- 创建窗口背景
+    window.Background = RoundedRectangle(
+        window.Position,
+        window.Size,
+        10,
+        window.Theme.Background,
+        true
+    )
+    window.Background.ZIndex = window.ZIndex
+    
+    -- 创建窗口边框
+    window.Border = RoundedRectangle(
+        window.Position,
+        window.Size,
+        10,
+        window.Theme.Border,
+        false
+    )
+    window.Border.Thickness = 2
+    window.Border.ZIndex = window.ZIndex + 1
+    
+    -- 创建窗口标题栏
+    window.Header = RoundedRectangle(
+        window.Position,
+        Vector2.new(window.Size.X, 40),
+        10,
+        window.Theme.Header,
+        true
+    )
+    window.Header.ZIndex = window.ZIndex + 2
+    
+    -- 创建窗口标题文本
+    window.TitleText = Drawing.new("Text")
+    window.TitleText.Text = window.Title
+    window.TitleText.Size = 20
+    window.TitleText.Center = true
+    window.TitleText.Position = Vector2.new(
+        window.Position.X + window.Size.X / 2,
+        window.Position.Y + 20
+    )
+    window.TitleText.Color = window.Theme.Text
+    window.TitleText.ZIndex = window.ZIndex + 3
+    
+    -- 创建关闭按钮
+    window.CloseButton = RoundedRectangle(
+        Vector2.new(window.Position.X + window.Size.X - 35, window.Position.Y + 10),
+        Vector2.new(25, 25),
+        5,
+        window.Theme.Danger,
+        true
+    )
+    window.CloseButton.ZIndex = window.ZIndex + 3
+    
+    window.CloseText = Drawing.new("Text")
+    window.CloseText.Text = "X"
+    window.CloseText.Size = 16
+    window.CloseText.Center = true
+    window.CloseText.Position = window.CloseButton.Position + Vector2.new(12.5, 12.5)
+    window.CloseText.Color = Color3.new(1, 1, 1)
+    window.CloseText.ZIndex = window.ZIndex + 4
+    
+    -- 添加阴影
+    window.BackgroundShadow = AddShadow(window.Background, window.Theme)
+    window.HeaderShadow = AddShadow(window.Header, window.Theme)
+    
+    -- 添加元素到管理列表
+    table.insert(window.Elements, window.BackgroundShadow)
+    table.insert(window.Elements, window.Background)
+    table.insert(window.Elements, window.HeaderShadow)
+    table.insert(window.Elements, window.Header)
+    table.insert(window.Elements, window.Border)
+    table.insert(window.Elements, window.TitleText)
+    table.insert(window.Elements, window.CloseButton)
+    table.insert(window.Elements, window.CloseText)
+    
+    -- 设置拖拽功能
+    game:GetService("UserInputService").InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            local mousePos = game:GetService("UserInputService"):GetMouseLocation()
+            if mousePos.X >= window.Header.Position.X and mousePos.X <= window.Header.Position.X + window.Header.Size.X and
+               mousePos.Y >= window.Header.Position.Y and mousePos.Y <= window.Header.Position.Y + window.Header.Size.Y then
+                window.Dragging = true
+                window.DragOffset = Vector2.new(
+                    mousePos.X - window.Position.X,
+                    mousePos.Y - window.Position.Y
+                )
+            end
+            
+            -- 检查关闭按钮
+            if mousePos.X >= window.CloseButton.Position.X and mousePos.X <= window.CloseButton.Position.X + window.CloseButton.Size.X and
+               mousePos.Y >= window.CloseButton.Position.Y and mousePos.Y <= window.CloseButton.Position.Y + window.CloseButton.Size.Y then
+                window:Destroy()
+            end
+        end
     end)
+    
+    game:GetService("UserInputService").InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            window.Dragging = false
+        end
+    end)
+    
+    game:GetService("RunService").RenderStepped:Connect(function()
+        if window.Dragging then
+            local mousePos = game:GetService("UserInputService"):GetMouseLocation()
+            window.Position = Vector2.new(
+                mousePos.X - window.DragOffset.X,
+                mousePos.Y - window.DragOffset.Y
+            )
+            window:UpdatePosition()
+        end
+    end)
+    
+    return window
 end
 
----------------------------------------------------
--- 4) 最小化/展开
----------------------------------------------------
-function toggleMinimise()
-    CONFIG.minimised = not CONFIG.minimised
-    if CONFIG.minimised then
-        TS:Create(mainFrame, TweenInfo.new(0.3), {Size=UDim2.new(0,0,0,0)}):Play()
-        buttonsFrame.Visible = false
-    else
-        TS:Create(mainFrame, TweenInfo.new(0.3), {Size=UDim2.new(0.4,0,0.6,0)}):Play()
-        buttonsFrame.Visible = true
+-- 更新窗口位置
+function NinjaUI:UpdatePosition()
+    -- 更新背景
+    self.Background.Position = self.Position
+    self.BackgroundShadow.Position = self.Position + Vector2.new(3, 3)
+    
+    -- 更新标题栏
+    self.Header.Position = self.Position
+    self.HeaderShadow.Position = self.Position + Vector2.new(3, 3)
+    
+    -- 更新边框
+    self.Border.Position = self.Position
+    
+    -- 更新标题文本
+    self.TitleText.Position = Vector2.new(
+        self.Position.X + self.Size.X / 2,
+        self.Position.Y + 20
+    )
+    
+    -- 更新关闭按钮
+    self.CloseButton.Position = Vector2.new(
+        self.Position.X + self.Size.X - 35,
+        self.Position.Y + 10
+    )
+    self.CloseText.Position = self.CloseButton.Position + Vector2.new(12.5, 12.5)
+    
+    -- 更新标签
+    for _, tab in ipairs(self.Tabs) do
+        tab:UpdatePosition(self.Position)
     end
-    if writefile then saveConfig() end
 end
 
----------------------------------------------------
--- 5) 热键隐藏/显示
----------------------------------------------------
-UIS.InputBegan:Connect(function(inp, gpe)
-    if gpe then return end
-    if inp.KeyCode == Enum.KeyCode.RightShift then
-        CONFIG.visible = not CONFIG.visible
-        screenGui.Enabled = CONFIG.visible
-        if writefile then saveConfig() end
+-- 创建标签页
+function NinjaUI:CreateTab(name)
+    local tab = {
+        Name = name,
+        Buttons = {},
+        Sections = {},
+        Elements = {},
+        Position = Vector2.new(self.Position.X, self.Position.Y + 50),
+        Size = Vector2.new(self.Size.X, self.Size.Y - 50),
+        Parent = self,
+        Visible = true,
+        ZIndex = self.ZIndex + 5
+    }
+    
+    -- 创建标签按钮
+    local buttonWidth = self.Size.X / 5
+    local buttonIndex = #self.Tabs
+    local button = RoundedRectangle(
+        Vector2.new(self.Position.X + buttonIndex * buttonWidth, self.Position.Y + 45),
+        Vector2.new(buttonWidth - 5, 30),
+        5,
+        self.Theme.Secondary,
+        true
+    )
+    button.ZIndex = self.ZIndex + 4
+    
+    local buttonText = Drawing.new("Text")
+    buttonText.Text = name
+    buttonText.Size = 16
+    buttonText.Center = true
+    buttonText.Position = button.Position + Vector2.new(buttonWidth / 2 - 2.5, 15)
+    buttonText.Color = self.Theme.Text
+    buttonText.ZIndex = self.ZIndex + 5
+    
+    -- 添加到元素列表
+    table.insert(self.Elements, button)
+    table.insert(self.Elements, buttonText)
+    
+    -- 设置点击事件
+    game:GetService("UserInputService").InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            local mousePos = game:GetService("UserInputService"):GetMouseLocation()
+            if mousePos.X >= button.Position.X and mousePos.X <= button.Position.X + button.Size.X and
+               mousePos.Y >= button.Position.Y and mousePos.Y <= button.Position.Y + button.Size.Y then
+                self:SetActiveTab(tab)
+            end
+        end
+    end)
+    
+    tab.Button = button
+    tab.ButtonText = buttonText
+    
+    table.insert(self.Tabs, tab)
+    
+    if #self.Tabs == 1 then
+        self:SetActiveTab(tab)
     end
-end)
+    
+    return tab
+end
 
----------------------------------------------------
--- 6) 工具：拖动函数
----------------------------------------------------
-function MakeDraggable(obj, handle)
-    handle = handle or obj
-    local drag, input, start, pos
-    handle.InputBegan:Connect(function(inp)
-        if inp.UserInputType == Enum.UserInputType.MouseButton1 then
-            drag = true
-            start = inp.Position
-            pos = obj.Position
-            inp.Changed:Connect(function()
-                if inp.UserInputState == Enum.UserInputState.End then
-                    drag = false
+-- 设置活动标签页
+function NinjaUI:SetActiveTab(tab)
+    if self.CurrentTab then
+        self.CurrentTab.Visible = false
+        self.CurrentTab.Button.Color = self.Theme.Secondary
+    end
+    
+    self.CurrentTab = tab
+    tab.Visible = true
+    tab.Button.Color = self.Theme.Primary
+    
+    for _, section in ipairs(tab.Sections) do
+        section:SetVisible(tab.Visible)
+    end
+end
+
+-- 创建分区
+function NinjaUI:CreateSection(tab, title)
+    local section = {
+        Title = title,
+        Elements = {},
+        Position = Vector2.new(tab.Position.X + 20, tab.Position.Y + 20 + (#tab.Sections * 180)),
+        Size = Vector2.new(tab.Size.X - 40, 170),
+        Parent = tab,
+        Visible = tab.Visible,
+        ZIndex = tab.ZIndex + 5
+    }
+    
+    -- 创建分区背景
+    section.Background = RoundedRectangle(
+        section.Position,
+        section.Size,
+        8,
+        self.Theme.Header,
+        true
+    )
+    section.Background.ZIndex = section.ZIndex
+    
+    -- 创建分区边框
+    section.Border = RoundedRectangle(
+        section.Position,
+        section.Size,
+        8,
+        self.Theme.Border,
+        false
+    )
+    section.Border.Thickness = 1
+    section.Border.ZIndex = section.ZIndex + 1
+    
+    -- 创建分区标题
+    section.TitleText = Drawing.new("Text")
+    section.TitleText.Text = title
+    section.TitleText.Size = 18
+    section.TitleText.Position = section.Position + Vector2.new(15, 10)
+    section.TitleText.Color = self.Theme.Text
+    section.TitleText.ZIndex = section.ZIndex + 2
+    
+    -- 添加到元素列表
+    table.insert(self.Elements, section.Background)
+    table.insert(self.Elements, section.Border)
+    table.insert(self.Elements, section.TitleText)
+    
+    table.insert(tab.Sections, section)
+    
+    -- 更新标签页位置
+    tab:UpdatePosition(self.Position)
+    
+    return section
+end
+
+-- 更新标签页位置
+function NinjaUI.Tab:UpdatePosition(windowPosition)
+    self.Position = Vector2.new(windowPosition.X, windowPosition.Y + 50)
+    
+    for i, section in ipairs(self.Sections) do
+        section.Position = Vector2.new(
+            self.Position.X + 20,
+            self.Position.Y + 20 + ((i - 1) * 180)
+        )
+        
+        if section.Background then
+            section.Background.Position = section.Position
+            section.Border.Position = section.Position
+            section.TitleText.Position = section.Position + Vector2.new(15, 10)
+        end
+        
+        -- 更新控件位置
+        for j, element in ipairs(section.Elements) do
+            if element.UpdatePosition then
+                element:UpdatePosition(section.Position)
+            end
+        end
+    end
+end
+
+-- 设置分区可见性
+function NinjaUI.Section:SetVisible(visible)
+    self.Visible = visible
+    self.Background.Visible = visible
+    self.Border.Visible = visible
+    self.TitleText.Visible = visible
+    
+    for _, element in ipairs(self.Elements) do
+        element:SetVisible(visible)
+    end
+end
+
+-- 创建按钮
+function NinjaUI:CreateButton(section, text, callback)
+    local button = {
+        Text = text,
+        Callback = callback,
+        Position = section.Position + Vector2.new(20, 40),
+        Size = Vector2.new(section.Size.X - 40, 35),
+        Parent = section,
+        Visible = section.Visible,
+        ZIndex = section.ZIndex + 3
+    }
+    
+    -- 创建按钮背景
+    button.Background = RoundedRectangle(
+        button.Position,
+        button.Size,
+        5,
+        self.Theme.Secondary,
+        true
+    )
+    button.Background.ZIndex = button.ZIndex
+    
+    -- 创建按钮文本
+    button.TextElement = Drawing.new("Text")
+    button.TextElement.Text = text
+    button.TextElement.Size = 16
+    button.TextElement.Center = true
+    button.TextElement.Position = button.Position + Vector2.new(button.Size.X / 2, 17)
+    button.TextElement.Color = self.Theme.Text
+    button.TextElement.ZIndex = button.ZIndex + 1
+    
+    -- 添加阴影
+    button.Shadow = AddShadow(button.Background, self.Theme)
+    button.Shadow.ZIndex = button.ZIndex - 1
+    
+    -- 添加到元素列表
+    table.insert(self.Elements, button.Shadow)
+    table.insert(self.Elements, button.Background)
+    table.insert(self.Elements, button.TextElement)
+    table.insert(section.Elements, button)
+    
+    -- 设置点击事件
+    game:GetService("UserInputService").InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 and button.Visible then
+            local mousePos = game:GetService("UserInputService"):GetMouseLocation()
+            if mousePos.X >= button.Background.Position.X and mousePos.X <= button.Background.Position.X + button.Background.Size.X and
+               mousePos.Y >= button.Background.Position.Y and mousePos.Y <= button.Background.Position.Y + button.Background.Size.Y then
+                -- 按钮点击动画
+                button.Background.Color = self.Theme.Primary
+                task.wait(0.1)
+                button.Background.Color = self.Theme.Secondary
+                
+                if callback then
+                    callback()
                 end
-            end)
+            end
         end
     end)
-    UIS.InputChanged:Connect(function(inp)
-        if inp.UserInputType == Enum.UserInputType.MouseMovement and drag then
-            local delta = inp.Position - start
-            obj.Position = UDim2.new(pos.X.Scale, pos.X.Offset + delta.X,
-                                     pos.Y.Scale, pos.Y.Offset + delta.Y)
+    
+    -- 设置悬停效果
+    game:GetService("RunService").RenderStepped:Connect(function()
+        if button.Visible then
+            local mousePos = game:GetService("UserInputService"):GetMouseLocation()
+            if mousePos.X >= button.Background.Position.X and mousePos.X <= button.Background.Position.X + button.Background.Size.X and
+               mousePos.Y >= button.Background.Position.Y and mousePos.Y <= button.Background.Position.Y + button.Background.Size.Y then
+                button.Background.Color = self.Theme.Primary
+            else
+                button.Background.Color = self.Theme.Secondary
+            end
         end
+    end)
+    
+    return button
+end
+
+-- 创建开关
+function NinjaUI:CreateToggle(section, text, defaultValue, callback)
+    local toggle = {
+        Text = text,
+        Value = defaultValue or false,
+        Callback = callback,
+        Position = section.Position + Vector2.new(20, 90),
+        Size = Vector2.new(30, 15),
+        Parent = section,
+        Visible = section.Visible,
+        ZIndex = section.ZIndex + 3
+    }
+    
+    -- 创建开关背景
+    toggle.Background = RoundedRectangle(
+        toggle.Position,
+        toggle.Size,
+        7,
+        self.Theme.Secondary,
+        true
+    )
+    toggle.Background.ZIndex = toggle.ZIndex
+    
+    -- 创建开关滑块
+    toggle.Slider = RoundedRectangle(
+        defaultValue and toggle.Position + Vector2.new(17, 0) or toggle.Position + Vector2.new(3, 0),
+        Vector2.new(12, 15),
+        6,
+        defaultValue and self.Theme.Success or self.Theme.Danger,
+        true
+    )
+    toggle.Slider.ZIndex = toggle.ZIndex + 1
+    
+    -- 创建开关文本
+    toggle.TextElement = Drawing.new("Text")
+    toggle.TextElement.Text = text
+    toggle.TextElement.Size = 16
+    toggle.TextElement.Position = toggle.Position + Vector2.new(40, -2)
+    toggle.TextElement.Color = self.Theme.Text
+    toggle.TextElement.ZIndex = toggle.ZIndex + 1
+    
+    -- 添加到元素列表
+    table.insert(self.Elements, toggle.Background)
+    table.insert(self.Elements, toggle.Slider)
+    table.insert(self.Elements, toggle.TextElement)
+    table.insert(section.Elements, toggle)
+    
+    -- 设置点击事件
+    game:GetService("UserInputService").InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 and toggle.Visible then
+            local mousePos = game:GetService("UserInputService"):GetMouseLocation()
+            if mousePos.X >= toggle.Background.Position.X and mousePos.X <= toggle.Background.Position.X + toggle.Background.Size.X and
+               mousePos.Y >= toggle.Background.Position.Y and mousePos.Y <= toggle.Background.Position.Y + toggle.Background.Size.Y then
+                toggle.Value = not toggle.Value
+                
+                -- 更新滑块位置
+                if toggle.Value then
+                    toggle.Slider.Position = toggle.Position + Vector2.new(17, 0)
+                    toggle.Slider.Color = self.Theme.Success
+                else
+                    toggle.Slider.Position = toggle.Position + Vector2.new(3, 0)
+                    toggle.Slider.Color = self.Theme.Danger
+                end
+                
+                if callback then
+                    callback(toggle.Value)
+                end
+            end
+        end
+    end)
+    
+    return toggle
+end
+
+-- 创建滑块
+function NinjaUI:CreateSlider(section, text, min, max, defaultValue, callback)
+    local slider = {
+        Text = text,
+        Min = min or 0,
+        Max = max or 100,
+        Value = defaultValue or min,
+        Callback = callback,
+        Position = section.Position + Vector2.new(20, 120),
+        Size = Vector2.new(section.Size.X - 40, 20),
+        Parent = section,
+        Visible = section.Visible,
+        ZIndex = section.ZIndex + 3,
+        Dragging = false
+    }
+    
+    -- 计算初始位置
+    local range = slider.Max - slider.Min
+    local percentage = (slider.Value - slider.Min) / range
+    local sliderPosition = slider.Position + Vector2.new(percentage * slider.Size.X, 0)
+    
+    -- 创建滑块背景
+    slider.Background = RoundedRectangle(
+        slider.Position,
+        slider.Size,
+        3,
+        self.Theme.Header,
+        true
+    )
+    slider.Background.ZIndex = slider.ZIndex
+    
+    -- 创建滑块轨道
+    slider.Track = RoundedRectangle(
+        slider.Position + Vector2.new(0, 8),
+        Vector2.new(slider.Size.X, 4),
+        2,
+        self.Theme.Border,
+        true
+    )
+    slider.Track.ZIndex = slider.ZIndex + 1
+    
+    -- 创建滑块填充
+    slider.Fill = RoundedRectangle(
+        slider.Position + Vector2.new(0, 8),
+        Vector2.new(percentage * slider.Size.X, 4),
+        2,
+        self.Theme.Primary,
+        true
+    )
+    slider.Fill.ZIndex = slider.ZIndex + 2
+    
+    -- 创建滑块手柄
+    slider.Handle = RoundedRectangle(
+        sliderPosition - Vector2.new(5, 5),
+        Vector2.new(10, 18),
+        4,
+        self.Theme.Secondary,
+        true
+    )
+    slider.Handle.ZIndex = slider.ZIndex + 3
+    
+    -- 创建滑块文本
+    slider.TextElement = Drawing.new("Text")
+    slider.TextElement.Text = text .. ": " .. tostring(slider.Value)
+    slider.TextElement.Size = 16
+    slider.TextElement.Position = slider.Position + Vector2.new(0, -20)
+    slider.TextElement.Color = self.Theme.Text
+    slider.TextElement.ZIndex = slider.ZIndex + 4
+    
+    -- 添加到元素列表
+    table.insert(self.Elements, slider.Background)
+    table.insert(self.Elements, slider.Track)
+    table.insert(self.Elements, slider.Fill)
+    table.insert(self.Elements, slider.Handle)
+    table.insert(self.Elements, slider.TextElement)
+    table.insert(section.Elements, slider)
+    
+    -- 设置拖拽事件
+    game:GetService("UserInputService").InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 and slider.Visible then
+            local mousePos = game:GetService("UserInputService"):GetMouseLocation()
+            if mousePos.X >= slider.Background.Position.X and mousePos.X <= slider.Background.Position.X + slider.Background.Size.X and
+               mousePos.Y >= slider.Background.Position.Y and mousePos.Y <= slider.Background.Position.Y + slider.Background.Size.Y then
+                slider.Dragging = true
+                slider:UpdateValue(mousePos.X)
+            end
+        end
+    end)
+    
+    game:GetService("UserInputService").InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            slider.Dragging = false
+        end
+    end)
+    
+    game:GetService("RunService").RenderStepped:Connect(function()
+        if slider.Dragging then
+            local mousePos = game:GetService("UserInputService"):GetMouseLocation()
+            slider:UpdateValue(mousePos.X)
+        end
+    end)
+    
+    return slider
+end
+
+-- 更新滑块值
+function NinjaUI.Slider:UpdateValue(xPos)
+    local relativeX = math.clamp(xPos - self.Position.X, 0, self.Size.X)
+    local percentage = relativeX / self.Size.X
+    self.Value = math.floor(self.Min + (self.Max - self.Min) * percentage)
+    
+    -- 更新UI
+    self.Fill.Size = Vector2.new(relativeX, 4)
+    self.Handle.Position = self.Position + Vector2.new(relativeX - 5, -5)
+    self.TextElement.Text = self.Text .. ": " .. tostring(self.Value)
+    
+    if self.Callback then
+        self.Callback(self.Value)
+    end
+end
+
+-- 创建标签
+function NinjaUI:CreateLabel(section, text)
+    local label = {
+        Text = text,
+        Position = section.Position + Vector2.new(20, 40),
+        Parent = section,
+        Visible = section.Visible,
+        ZIndex = section.ZIndex + 3
+    }
+    
+    -- 创建标签文本
+    label.TextElement = Drawing.new("Text")
+    label.TextElement.Text = text
+    label.TextElement.Size = 16
+    label.TextElement.Position = label.Position
+    label.TextElement.Color = self.Theme.Text
+    label.TextElement.ZIndex = label.ZIndex
+    
+    -- 添加到元素列表
+    table.insert(self.Elements, label.TextElement)
+    table.insert(section.Elements, label)
+    
+    return label
+end
+
+-- 设置控件可见性
+function NinjaUI.Button:SetVisible(visible)
+    self.Visible = visible
+    self.Background.Visible = visible
+    self.TextElement.Visible = visible
+    self.Shadow.Visible = visible
+end
+
+function NinjaUI.Toggle:SetVisible(visible)
+    self.Visible = visible
+    self.Background.Visible = visible
+    self.Slider.Visible = visible
+    self.TextElement.Visible = visible
+end
+
+function NinjaUI.Slider:SetVisible(visible)
+    self.Visible = visible
+    self.Background.Visible = visible
+    self.Track.Visible = visible
+    self.Fill.Visible = visible
+    self.Handle.Visible = visible
+    self.TextElement.Visible = visible
+end
+
+function NinjaUI.Label:SetVisible(visible)
+    self.Visible = visible
+    self.TextElement.Visible = visible
+end
+
+-- 销毁窗口
+function NinjaUI:Destroy()
+    for _, element in ipairs(self.Elements) do
+        if element.Remove then
+            element:Remove()
+        end
+    end
+    
+    self.Visible = false
+    self.Active = false
+end
+
+-- 示例使用
+local function exampleUsage()
+    -- 创建窗口
+    local window = NinjaUI:CreateWindow("NinjaUI 示例", Vector2.new(450, 550), Vector2.new(200, 100), "Ocean")
+    
+    -- 创建标签页
+    local mainTab = window:CreateTab("主界面")
+    local settingsTab = window:CreateTab("设置")
+    
+    -- 主标签页的分区
+    local infoSection = window:CreateSection(mainTab, "系统信息")
+    local actionsSection = window:CreateSection(mainTab, "功能操作")
+    
+    -- 信息标签
+    window:CreateLabel(infoSection, "当前执行器: Ninja Injector")
+    window:CreateLabel(infoSection, "游戏名称: " .. game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId).Name)
+    window:CreateLabel(infoSection, "玩家名称: " .. game.Players.LocalPlayer.Name)
+    
+    -- 按钮
+    window:CreateButton(actionsSection, "显示通知", function()
+        print("显示通知按钮被点击!")
+    end)
+    
+    -- 开关
+    window:CreateToggle(actionsSection, "启用功能", false, function(value)
+        print("功能状态: " .. tostring(value))
+    end)
+    
+    -- 滑块
+    window:CreateSlider(actionsSection, "音量控制", 0, 100, 80, function(value)
+        print("音量设置为: " .. value)
+    end)
+    
+    -- 设置标签页的分区
+    local themeSection = window:CreateSection(settingsTab, "主题设置")
+    window:CreateButton(themeSection, "切换为深色主题", function()
+        window:Destroy()
+        exampleUsage()
+    end)
+    
+    window:CreateButton(themeSection, "切换为浅色主题", function()
+        window:Destroy()
+        exampleUsage()
     end)
 end
 
----------------------------------------------------
--- 7) 初始化完毕
----------------------------------------------------
-print("🥷 忍者注入器已就绪 | 双击顶部可最小化 | 按 RightShift 隐藏")
+-- 运行示例
+exampleUsage()
+
+return NinjaUI
