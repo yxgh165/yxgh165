@@ -1,0 +1,458 @@
+-- Roblox ImGui 库 - 纯Lua实现
+-- 提供基本的UI组件和布局功能
+
+local ImGui = {}
+ImGui.__index = ImGui
+
+-- 初始化ImGui
+function ImGui.init()
+    local self = setmetatable({}, ImGui)
+    self.windows = {}
+    self.activeWindow = nil
+    self.mousePosition = Vector2.new(0, 0)
+    self.mouseDown = false
+    self.hotItem = nil
+    self.activeItem = nil
+    return self
+end
+
+-- 开始新窗口
+function ImGui:beginWindow(title, x, y, width, height)
+    local window = {
+        title = title,
+        position = Vector2.new(x, y),
+        size = Vector2.new(width, height),
+        items = {},
+        currentY = 40, -- 从标题栏下方开始
+        padding = 10,
+        itemSpacing = 5
+    }
+    
+    table.insert(self.windows, window)
+    self.activeWindow = window
+    return window
+end
+
+-- 结束当前窗口
+function ImGui:endWindow()
+    self.activeWindow = nil
+end
+
+-- 绘制按钮
+function ImGui:button(label)
+    if not self.activeWindow then return false end
+    
+    local window = self.activeWindow
+    local buttonWidth = 100
+    local buttonHeight = 30
+    
+    -- 计算按钮位置
+    local buttonX = window.position.X + window.padding
+    local buttonY = window.position.Y + window.currentY
+    
+    -- 创建按钮区域
+    local buttonRect = {
+        x = buttonX,
+        y = buttonY,
+        width = buttonWidth,
+        height = buttonHeight
+    }
+    
+    -- 检查鼠标交互
+    local isHot = self:isPointInRect(self.mousePosition, buttonRect)
+    local isActive = false
+    local clicked = false
+    
+    if isHot then
+        self.hotItem = label
+        
+        if self.mouseDown then
+            self.activeItem = label
+        end
+        
+        if self.activeItem == label and not self.mouseDown then
+            clicked = true
+            self.activeItem = nil
+        end
+    end
+    
+    -- 绘制按钮
+    local buttonColor = Color3.fromRGB(80, 80, 80) -- 默认颜色
+    
+    if isHot then
+        buttonColor = Color3.fromRGB(100, 100, 100) -- 悬停颜色
+    end
+    
+    if self.activeItem == label then
+        buttonColor = Color3.fromRGB(120, 120, 120) -- 按下颜色
+    end
+    
+    -- 在Roblox中绘制按钮
+    local buttonFrame = Instance.new("Frame")
+    buttonFrame.Size = UDim2.new(0, buttonWidth, 0, buttonHeight)
+    buttonFrame.Position = UDim2.new(0, buttonX, 0, buttonY)
+    buttonFrame.BackgroundColor3 = buttonColor
+    buttonFrame.BorderSizePixel = 0
+    buttonFrame.Parent = game.Workspace
+    
+    local buttonLabel = Instance.new("TextLabel")
+    buttonLabel.Size = UDim2.new(1, 0, 1, 0)
+    buttonLabel.Text = label
+    buttonLabel.TextColor3 = Color3.new(1, 1, 1)
+    buttonLabel.BackgroundTransparency = 1
+    buttonLabel.Parent = buttonFrame
+    
+    -- 更新布局位置
+    window.currentY = window.currentY + buttonHeight + window.itemSpacing
+    
+    -- 存储按钮引用
+    table.insert(window.items, {
+        type = "button",
+        frame = buttonFrame,
+        label = buttonLabel,
+        rect = buttonRect,
+        clicked = clicked
+    })
+    
+    return clicked
+end
+
+-- 绘制复选框
+function ImGui:checkbox(label, checked)
+    if not self.activeWindow then return checked end
+    
+    local window = self.activeWindow
+    local checkboxSize = 20
+    local labelWidth = 100
+    local totalWidth = checkboxSize + 5 + labelWidth
+    
+    -- 计算位置
+    local x = window.position.X + window.padding
+    local y = window.position.Y + window.currentY
+    
+    -- 创建区域
+    local checkboxRect = {
+        x = x,
+        y = y,
+        width = checkboxSize,
+        height = checkboxSize
+    }
+    
+    -- 检查鼠标交互
+    local isHot = self:isPointInRect(self.mousePosition, checkboxRect)
+    local clicked = false
+    
+    if isHot then
+        self.hotItem = label
+        
+        if self.mouseDown then
+            self.activeItem = label
+        end
+        
+        if self.activeItem == label and not self.mouseDown then
+            clicked = true
+            self.activeItem = nil
+            checked = not checked
+        end
+    end
+    
+    -- 绘制复选框
+    local checkboxFrame = Instance.new("Frame")
+    checkboxFrame.Size = UDim2.new(0, checkboxSize, 0, checkboxSize)
+    checkboxFrame.Position = UDim2.new(0, x, 0, y)
+    checkboxFrame.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    checkboxFrame.BorderSizePixel = 1
+    checkboxFrame.BorderColor3 = Color3.new(0.5, 0.5, 0.5)
+    checkboxFrame.Parent = game.Workspace
+    
+    if checked then
+        local check = Instance.new("Frame")
+        check.Size = UDim2.new(0.6, 0, 0.6, 0)
+        check.Position = UDim2.new(0.2, 0, 0.2, 0)
+        check.BackgroundColor3 = Color3.new(1, 1, 1)
+        check.BorderSizePixel = 0
+        check.Parent = checkboxFrame
+    end
+    
+    -- 绘制标签
+    local labelText = Instance.new("TextLabel")
+    labelText.Size = UDim2.new(0, labelWidth, 0, checkboxSize)
+    labelText.Position = UDim2.new(0, x + checkboxSize + 5, 0, y)
+    labelText.Text = label
+    labelText.TextColor3 = Color3.new(1, 1, 1)
+    labelText.TextXAlignment = Enum.TextXAlignment.Left
+    labelText.BackgroundTransparency = 1
+    labelText.Parent = game.Workspace
+    
+    -- 更新布局位置
+    window.currentY = window.currentY + checkboxSize + window.itemSpacing
+    
+    -- 存储组件引用
+    table.insert(window.items, {
+        type = "checkbox",
+        frame = checkboxFrame,
+        label = labelText,
+        rect = checkboxRect,
+        checked = checked
+    })
+    
+    return checked
+end
+
+-- 绘制滑块
+function ImGui:slider(label, value, min, max)
+    if not self.activeWindow then return value end
+    
+    local window = self.activeWindow
+    local sliderWidth = 200
+    local sliderHeight = 20
+    local labelWidth = 100
+    
+    -- 计算位置
+    local x = window.position.X + window.padding
+    local y = window.position.Y + window.currentY
+    
+    -- 创建滑块区域
+    local sliderRect = {
+        x = x,
+        y = y,
+        width = sliderWidth,
+        height = sliderHeight
+    }
+    
+    -- 检查鼠标交互
+    local isHot = self:isPointInRect(self.mousePosition, sliderRect)
+    local isActive = false
+    
+    if isHot then
+        self.hotItem = label
+        
+        if self.mouseDown then
+            self.activeItem = label
+            isActive = true
+        end
+    end
+    
+    if self.activeItem == label then
+        if self.mouseDown then
+            isActive = true
+        else
+            self.activeItem = nil
+        end
+    end
+    
+    -- 更新值
+    if isActive then
+        local normalized = (self.mousePosition.X - x) / sliderWidth
+        value = min + (max - min) * math.clamp(normalized, 0, 1)
+    end
+    
+    -- 绘制滑块背景
+    local sliderBg = Instance.new("Frame")
+    sliderBg.Size = UDim2.new(0, sliderWidth, 0, sliderHeight)
+    sliderBg.Position = UDim2.new(0, x, 0, y)
+    sliderBg.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    sliderBg.BorderSizePixel = 0
+    sliderBg.Parent = game.Workspace
+    
+    -- 绘制滑块填充
+    local fillWidth = sliderWidth * ((value - min) / (max - min))
+    local sliderFill = Instance.new("Frame")
+    sliderFill.Size = UDim2.new(0, fillWidth, 0, sliderHeight)
+    sliderFill.Position = UDim2.new(0, x, 0, y)
+    sliderFill.BackgroundColor3 = Color3.fromRGB(100, 100, 200)
+    sliderFill.BorderSizePixel = 0
+    sliderFill.Parent = game.Workspace
+    
+    -- 绘制滑块手柄
+    local handleSize = 30
+    local handleX = x + fillWidth - handleSize/2
+    local handle = Instance.new("Frame")
+    handle.Size = UDim2.new(0, handleSize, 0, sliderHeight + 10)
+    handle.Position = UDim2.new(0, handleX, 0, y - 5)
+    handle.BackgroundColor3 = Color3.fromRGB(150, 150, 200)
+    handle.BorderSizePixel = 0
+    handle.Parent = game.Workspace
+    
+    -- 绘制标签
+    local labelText = Instance.new("TextLabel")
+    labelText.Size = UDim2.new(0, labelWidth, 0, sliderHeight)
+    labelText.Position = UDim2.new(0, x + sliderWidth + 10, 0, y)
+    labelText.Text = string.format("%s: %.2f", label, value)
+    labelText.TextColor3 = Color3.new(1, 1, 1)
+    labelText.TextXAlignment = Enum.TextXAlignment.Left
+    labelText.BackgroundTransparency = 1
+    labelText.Parent = game.Workspace
+    
+    -- 更新布局位置
+    window.currentY = window.currentY + sliderHeight + window.itemSpacing
+    
+    -- 存储组件引用
+    table.insert(window.items, {
+        type = "slider",
+        bg = sliderBg,
+        fill = sliderFill,
+        handle = handle,
+        label = labelText,
+        rect = sliderRect,
+        value = value,
+        min = min,
+        max = max
+    })
+    
+    return value
+end
+
+-- 绘制文本输入框
+function ImGui:inputText(label, text)
+    if not self.activeWindow then return text end
+    
+    local window = self.activeWindow
+    local inputWidth = 200
+    local inputHeight = 30
+    
+    -- 计算位置
+    local x = window.position.X + window.padding
+    local y = window.position.Y + window.currentY
+    
+    -- 创建输入框区域
+    local inputRect = {
+        x = x,
+        y = y,
+        width = inputWidth,
+        height = inputHeight
+    }
+    
+    -- 检查鼠标交互
+    local isHot = self:isPointInRect(self.mousePosition, inputRect)
+    local clicked = false
+    
+    if isHot then
+        self.hotItem = label
+        
+        if self.mouseDown then
+            clicked = true
+            self.activeItem = label
+        end
+    end
+    
+    -- 绘制输入框背景
+    local inputBg = Instance.new("Frame")
+    inputBg.Size = UDim2.new(0, inputWidth, 0, inputHeight)
+    inputBg.Position = UDim2.new(0, x, 0, y)
+    inputBg.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    inputBg.BorderSizePixel = 0
+    inputBg.Parent = game.Workspace
+    
+    -- 绘制文本
+    local inputText = Instance.new("TextLabel")
+    inputText.Size = UDim2.new(1, -10, 1, 0)
+    inputText.Position = UDim2.new(0, 5, 0, 0)
+    inputText.Text = text
+    inputText.TextColor3 = Color3.new(1, 1, 1)
+    inputText.TextXAlignment = Enum.TextXAlignment.Left
+    inputText.BackgroundTransparency = 1
+    inputText.Parent = inputBg
+    
+    -- 绘制标签
+    local labelText = Instance.new("TextLabel")
+    labelText.Size = UDim2.new(0, 100, 0, inputHeight)
+    labelText.Position = UDim2.new(0, x + inputWidth + 10, 0, y)
+    labelText.Text = label
+    labelText.TextColor3 = Color3.new(1, 1, 1)
+    labelText.TextXAlignment = Enum.TextXAlignment.Left
+    labelText.BackgroundTransparency = 1
+    labelText.Parent = game.Workspace
+    
+    -- 更新布局位置
+    window.currentY = window.currentY + inputHeight + window.itemSpacing
+    
+    -- 存储组件引用
+    table.insert(window.items, {
+        type = "input",
+        bg = inputBg,
+        text = inputText,
+        label = labelText,
+        rect = inputRect,
+        value = text
+    })
+    
+    return text
+end
+
+-- 绘制标签
+function ImGui:label(text)
+    if not self.activeWindow then return end
+    
+    local window = self.activeWindow
+    local labelWidth = 300
+    local labelHeight = 30
+    
+    -- 计算位置
+    local x = window.position.X + window.padding
+    local y = window.position.Y + window.currentY
+    
+    -- 绘制标签
+    local labelText = Instance.new("TextLabel")
+    labelText.Size = UDim2.new(0, labelWidth, 0, labelHeight)
+    labelText.Position = UDim2.new(0, x, 0, y)
+    labelText.Text = text
+    labelText.TextColor3 = Color3.new(1, 1, 1)
+    labelText.TextXAlignment = Enum.TextXAlignment.Left
+    labelText.BackgroundTransparency = 1
+    labelText.Parent = game.Workspace
+    
+    -- 更新布局位置
+    window.currentY = window.currentY + labelHeight + window.itemSpacing
+    
+    -- 存储组件引用
+    table.insert(window.items, {
+        type = "label",
+        text = labelText
+    })
+end
+
+-- 检查点是否在矩形内
+function ImGui:isPointInRect(point, rect)
+    return point.X >= rect.x and point.X <= rect.x + rect.width and
+           point.Y >= rect.y and point.Y <= rect.y + rect.height
+end
+
+-- 更新鼠标状态
+function ImGui:updateMouse(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement then
+        self.mousePosition = Vector2.new(input.Position.X, input.Position.Y)
+    end
+    
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        self.mouseDown = (input.UserInputState == Enum.UserInputState.Begin)
+    end
+end
+
+-- 清理所有UI元素
+function ImGui:cleanup()
+    for _, window in ipairs(self.windows) do
+        for _, item in ipairs(window.items) do
+            if item.type == "button" then
+                item.frame:Destroy()
+                item.label:Destroy()
+            elseif item.type == "checkbox" then
+                item.frame:Destroy()
+                item.label:Destroy()
+            elseif item.type == "slider" then
+                item.bg:Destroy()
+                item.fill:Destroy()
+                item.handle:Destroy()
+                item.label:Destroy()
+            elseif item.type == "input" then
+                item.bg:Destroy()
+                item.label:Destroy()
+            elseif item.type == "label" then
+                item.text:Destroy()
+            end
+        end
+    end
+    self.windows = {}
+end
+
+return ImGui
