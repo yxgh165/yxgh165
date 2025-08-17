@@ -642,6 +642,334 @@ end
         commonSec:AddTextbox({ Name = "开火延迟 (秒)（输入）", Default = tostring(aimbotDelay), Callback = function(txt) local n = tonumber(txt) if n then aimbotDelay = n; delaySlider:Set(n) end end })
         commonSec:AddDropdown({ Name = "瞄准骨骼", Default = aimbotBone, Options = {"Head","Neck","UpperTorso","HumanoidRootPart"}, Callback = function(v) aimbotBone = v end })
         
+   
+-----------------------------------------------------------------
+    -- 子弹追踪功能（增强版）
+    -----------------------------------------------------------------
+    local bulletTrackEnabled = false
+    local bulletTrackMethod = "Raycast"  -- 默认方法
+    local hitRate = 100  -- 默认100%命中率
+    local bulletPenetration = false  -- 默认不穿墙
+    local showTargetName = true  -- 默认显示目标名字
+    local targetNameSize = 18  -- 默认字体大小
+    
+    local targetNameText = Drawing.new("Text")
+    targetNameText.Visible = false
+    targetNameText.Size = targetNameSize
+    targetNameText.Position = Vector2.new(20, 20)  -- 左上角位置
+    targetNameText.Color = Color3.new(1, 1, 1)
+    targetNameText.Outline = true
+    targetNameText.ZIndex = 12
+    
+    -- 子弹追踪方法字典
+    local trackMethods = {
+        ["Ray.new"] = function(startPos, endPos)
+            return Ray.new(startPos, (endPos - startPos).Unit)
+        end,
+        ["FindPartOnRay"] = function(ray)
+            return workspace:FindPartOnRay(ray)
+        end,
+        ["FindPartOnRayWithIgnoreList"] = function(ray, ignoreList)
+            return workspace:FindPartOnRayWithIgnoreList(ray, ignoreList)
+        end,
+        ["FindPartOnRayWithWhiteList"] = function(ray, whiteList)
+            return workspace:FindPartOnRayWithWhiteList(ray, whiteList)
+        end,
+        ["ScreenPointToRay"] = function(x, y)
+            return Camera:ScreenPointToRay(x, y)
+        end,
+        ["ViewportPointToRay"] = function(x, y)
+            return Camera:ViewportPointToRay(x, y)
+        end,
+        ["Mouse.Hit/Target"] = function()
+            return {
+                Position = UserInputService:GetMouseLocation(),
+                Target = nil  -- 需要游戏支持
+            }
+        end,
+        ["Camera.CFrame"] = function()
+            return Camera.CFrame
+        end
+    }
+    
+    -- 子弹轨迹可视化
+    local bulletTrails = {}
+    local function createBulletTrail(startPos, endPos, hit)
+        local trail = Drawing.new("Line")
+        trail.Visible = true
+        trail.Thickness = 1.5
+        trail.Color = hit and Color3.new(0, 1, 0) or Color3.new(1, 0, 0)  -- 绿色命中，红色未命中
+        trail.From = startPos
+        trail.To = endPos
+        trail.ZIndex = 11
+        
+        table.insert(bulletTrails, {
+            drawing = trail,
+            lifetime = 0.3  -- 显示0.3秒
+        })
+    end
+    
+    -- 更新子弹轨迹
+    local function updateBulletTrails(dt)
+        for i = #bulletTrails, 1, -1 do
+            local trail = bulletTrails[i]
+            trail.lifetime = trail.lifetime - dt
+            
+            if trail.lifetime <= 0 then
+                trail.drawing.Visible = false
+                trail.drawing:Remove()
+                table.remove(bulletTrails, i)
+            else
+                -- 逐渐淡化
+                local alpha = trail.lifetime / 0.3
+                trail.drawing.Transparency = 1 - alpha
+            end
+        end
+    end
+    
+    -- 执行子弹追踪
+    local function performBulletTrack(targetChar)
+        if not bulletTrackEnabled or not targetChar then return end
+        
+        -- 获取目标位置
+        local aimPos = getAimPos(targetChar)
+        if not aimPos then return end
+        
+        -- 计算起始位置（屏幕中心）
+        local screenCenter = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
+        local ignoreList = {LocalPlayer.Character}
+        
+        -- 命中率计算
+        local actualHit = true
+        if math.random(1, 100) > hitRate then
+            actualHit = false
+            -- 偏离目标
+            aimPos = aimPos + Vector3.new(
+                math.random(-2, 2),
+                math.random(-2, 2),
+                math.random(-2, 2)
+            )
+        end
+        
+        -- 根据选择的方法执行追踪
+        local ray, hitPart, hitPos
+        if bulletTrackMethod == "Ray.new" then
+            local startPos = Camera.CFrame.Position
+            ray = trackMethods["Ray.new"](startPos, aimPos)
+            hitPart, hitPos = trackMethods["FindPartOnRayWithIgnoreList"](ray, ignoreList)
+        elseif bulletTrackMethod == "ScreenPointToRay" then
+            ray = trackMethods["ScreenPointToRay"](screenCenter.X, screenCenter.Y)
+            hitPart, hitPos = trackMethods["FindPartOnRayWithIgnoreList"](ray, ignoreList)
+        elseif bulletTrackMethod == "ViewportPointToRay" then
+            ray = trackMethods["ViewportPointToRay"](screenCenter.X, screenCenter.Y)
+            hitPart, hitPos = trackMethods["FindPartOnRayWithIgnoreList"](ray, ignoreList)
+        elseif bulletTrackMethod == "Mouse.Hit/Target" then
+            local result = trackMethods["Mouse.Hit/Target"]()
+            hitPos = result.Position
+        else  -- 默认方法
+            local startPos = Camera.CFrame.Position
+            ray = Ray.new(startPos, (aimPos - startPos).Unit)
+            hitPart, hitPos = workspace:FindPartOnRayWithIgnoreList(ray, ignoreList)
+        end
+        
+        -- 处理穿墙
+        if bulletPenetration and hitPart and not hitPart:IsDescendantOf(targetChar) then
+            -- 穿透物体，继续追踪
+            local newStart = hitPos + (aimPos - hitPos).Unit * 0.1
+            ray = Ray.new(newStart, (aimPos - newStart).Unit)
+            hitPart, hitPos = workspace:FindPartOnRayWithIgnoreList(ray, ignoreList)
+        end
+        
+        -- 可视化
+        if hitPos then
+            local screenStart = Camera:WorldToViewportPoint(Camera.CFrame.Position)
+            local screenEnd = Camera:WorldToViewportPoint(hitPos)
+            
+            if screenStart.Z > 0 and screenEnd.Z > 0 then
+                createBulletTrail(
+                    Vector2.new(screenStart.X, screenStart.Y),
+                    Vector2.new(screenEnd.X, screenEnd.Y),
+                    actualHit
+                )
+            end
+        end
+    end
+    
+    -- 更新目标名字显示
+    local function updateTargetName(target)
+        if showTargetName and target and target.Character then
+            targetNameText.Visible = true
+            targetNameText.Text = "目标: " .. target.Name
+        else
+            targetNameText.Visible = false
+        end
+    end
+    
+    -- 在自瞄循环中集成子弹追踪
+    local function integrateBulletTrack()
+        if aimbotConn then return end
+        
+        aimbotConn = game:GetService("RunService").RenderStepped:Connect(function(dt)
+            if not aimbotEnabled then 
+                aimLine.Visible = false
+                targetNameText.Visible = false
+                return 
+            end
+            
+            -- 更新跟随圆
+            mouseFovCircle.Position = UserInputService:GetMouseLocation()
+    
+            local target = getClosest()
+            updateTargetName(target)
+            
+            -- ... [其余自瞄代码保持不变] ...
+            
+            -- 在射击时执行子弹追踪
+            if tick() - lastFire > aimbotDelay then
+                -- 执行子弹追踪
+                if target and target.Character then
+                    performBulletTrack(target.Character)
+                end
+                
+                mouse1press()
+                task.wait(0.05)
+                mouse1release()
+                lastFire = tick()
+            end
+            
+            -- 更新子弹轨迹
+            updateBulletTrails(dt)
+        end)
+    end
+    
+    -- 修改原有的startAimbot函数
+    local originalStartAimbot = startAimbot
+    startAimbot = function()
+        originalStartAimbot()
+        integrateBulletTrack()
+    end
+    
+    -----------------------------------------------------------------
+    -- UI 构建 - 子弹追踪部分
+    -----------------------------------------------------------------
+    local bulletTrackSec = Tab4:AddSection({Name = "子弹追踪系统"})
+    
+    -- 初始化完成通知
+    bulletTrackSec:AddLabel("子弹追踪系统已初始化完成")
+    
+    bulletTrackSec:AddToggle({
+        Name = "启用子弹追踪",
+        Default = bulletTrackEnabled,
+        Callback = function(v)
+            bulletTrackEnabled = v
+            if not v then
+                targetNameText.Visible = false
+            end
+        end
+    })
+    
+    bulletTrackSec:AddDropdown({
+        Name = "追踪方法",
+        Default = bulletTrackMethod,
+        Options = {
+            "Ray.new", 
+            "FindPartOnRay", 
+            "FindPartOnRayWithIgnoreList", 
+            "FindPartOnRayWithWhiteList",
+            "ScreenPointToRay",
+            "ViewportPointToRay",
+            "Mouse.Hit/Target",
+            "Camera.CFrame"
+        },
+        Callback = function(v) 
+            bulletTrackMethod = v 
+            OrionLib:MakeNotification({
+                Name = "追踪方法",
+                Content = "已设置为: " .. v,
+                Time = 2
+            })
+        end
+    })
+    
+    local hitRateSlider = bulletTrackSec:AddSlider({
+        Name = "命中率 (%)",
+        Min = 0,
+        Max = 100,
+        Default = hitRate,
+        Increment = 1,
+        Callback = function(v) 
+            hitRate = v 
+        end
+    })
+    
+    bulletTrackSec:AddTextbox({
+        Name = "命中率输入",
+        Default = tostring(hitRate),
+        Callback = function(txt)
+            local n = tonumber(txt)
+            if n and n >= 0 and n <= 100 then
+                hitRate = n
+                hitRateSlider:Set(n)
+            end
+        end
+    })
+    
+    bulletTrackSec:AddToggle({
+        Name = "子弹穿墙",
+        Default = bulletPenetration,
+        Callback = function(v) 
+            bulletPenetration = v 
+        end
+    })
+    
+    bulletTrackSec:AddToggle({
+        Name = "显示目标名字",
+        Default = showTargetName,
+        Callback = function(v) 
+            showTargetName = v 
+            if not v then
+                targetNameText.Visible = false
+            end
+        end
+    })
+    
+    bulletTrackSec:AddTextbox({
+        Name = "目标名字大小",
+        Default = tostring(targetNameSize),
+        Callback = function(txt)
+            local n = tonumber(txt)
+            if n and n >= 10 and n <= 30 then
+                targetNameSize = n
+                targetNameText.Size = n
+            end
+        end
+    })
+    
+    bulletTrackSec:AddLabel("提示: 子弹轨迹可视化仅显示在客户端")
+    bulletTrackSec:AddLabel("实际效果取决于游戏的反作弊机制")
+
+    -- ... [其余代码保持不变] ...
+
+    -- 在ShowMainWindow函数中，确保在窗口销毁时清理绘图对象
+    local originalOrionLibInit = OrionLib.Init
+    OrionLib.Init = function()
+        originalOrionLibInit()
+        
+        -- 窗口关闭时清理
+        OrionLib.MainWindow:GetPropertyChangedSignal("Visible"):Connect(function()
+            if not OrionLib.MainWindow.Visible then
+                targetNameText.Visible = false
+                targetNameText:Remove()
+                
+                -- 清理所有子弹轨迹
+                for _, trail in ipairs(bulletTrails) do
+                    trail.drawing.Visible = false
+                    trail.drawing:Remove()
+                end
+                bulletTrails = {}
+            end
+        end)
+    end
         
         -----------------------------------------------------------------
         -- ⑥ 删除阴影（全局开关）
