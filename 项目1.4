@@ -1,4 +1,23 @@
-(function()
+-- 修复远程事件错误的核心代码
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+-- 确保正确处理远程事件
+local function setupRemoteEvents()
+    local remoteEvent = ReplicatedStorage:FindFirstChild("SendLikelySpeakingUsers")
+    if remoteEvent then
+        remoteEvent.OnClientEvent:Connect(function(...)
+            -- 添加你的事件处理逻辑
+            print("处理远程事件:", ...)
+        end)
+    else
+        warn("未找到 SendLikelySpeakingUsers 远程事件")
+    end
+end
+
+-- 安全执行主脚本
+local function main()
     -- 强制 200×200 居中窗口
     getgenv().WindowSize = UDim2.new(0, 200, 0, 200)
     
@@ -562,7 +581,7 @@
             return part == nil or part:IsDescendantOf(LocalPlayer.Character)
         end
         
-        -- 获取最近目标 (修复玩家不动时不瞄准的问题)
+        -- 获取最近目标 (修复玩家站着不动时不瞄准的问题)
         local function getClosest()
             if not LocalPlayer.Character then return nil end
             
@@ -1150,4 +1169,14 @@
             Time = 2
         })
     end
-end)()
+end
+
+-- 安全执行
+local success, err = pcall(function()
+    setupRemoteEvents()
+    main()
+end)
+
+if not success then
+    warn("脚本执行错误: " .. tostring(err))
+end
