@@ -5,7 +5,7 @@
         getgenv().WindowSize = UDim2.new(0, 200, 0, 200)
         
         -- 使用更可靠的OrionLib加载源
-local OrionLib = loadstring(game:HttpGet("https://raw.githubusercontent.com/wsomoQaz/lua-/main/Xcccc"))()
+        local OrionLib = loadstring(game:HttpGet("https://raw.githubusercontent.com/shlexware/Orion/main/source"))()
         
         -- 卡密系统配置
         local KeySystem = {
@@ -1323,476 +1323,530 @@ local OrionLib = loadstring(game:HttpGet("https://raw.githubusercontent.com/wsom
             })
             
 
-        -----------------------------------------------------------------
-        -- 子弹追踪系统 (添加到人物功能Tab)
-        -----------------------------------------------------------------
-        local bulletTrackingEnabled = false
-        local trackingMethod = "Linear"  -- 默认追踪方法
-        local hitRate = 100              -- 默认命中率100%
-        local wallPenetration = false    -- 默认不穿墙
-        local showTargetInfo = true      -- 默认显示目标信息
-        local aimMode = "Distance"       -- 默认距离瞄准
-        local showTargetLine = true      -- 默认显示目标线条
-        local maxDistance = 300          -- 默认最大距离300米
-        
-        -- 追踪方法列表 (9种)
-        local trackingMethods = {
-            "Linear",            -- 1. 直线追踪
-            "Predictive",        -- 2. 预测追踪
-            "Curved",            -- 3. 曲线追踪
-            "Homing",            -- 4. 制导追踪
-            "Randomized",        -- 5. 随机扰动
-            "LagCompensated",    -- 6. 延迟补偿
-            "HeatSeeking",       -- 7. 热追踪
-            "Bouncing",          -- 8. 弹跳追踪
-            "Teleporting"        -- 9. 瞬移追踪
-        }
-        
-        -- 目标信息显示
-        local targetInfo = Drawing.new("Text")
-        targetInfo.Visible = false
-        targetInfo.Size = 18
-        targetInfo.Color = Color3.new(1, 1, 1)
-        targetInfo.Outline = true
-        targetInfo.OutlineColor = Color3.new(0, 0, 0)
-        targetInfo.Position = Vector2.new(10, 10)
-        targetInfo.Text = "目标: 无"
-        
-        -- 目标线条
-        local targetLine = Drawing.new("Line")
-        targetLine.Visible = false
-        targetLine.Thickness = 2
-        targetLine.Color = Color3.fromRGB(255, 50, 50)
-        targetLine.ZIndex = 10
-        
-        -- 获取当前目标
-        local function getTrackingTarget()
-            local closest, minDist = nil, math.huge
-            local camera = workspace.CurrentCamera
-            local localPlayer = game.Players.LocalPlayer
-            local mousePos = UserInputService:GetMouseLocation()
-            local center = Vector2.new(camera.ViewportSize.X/2, camera.ViewportSize.Y/2)
+            -----------------------------------------------------------------
+            -- 增强版子弹追踪系统（无需武器系统检测）
+            -----------------------------------------------------------------
+            local bulletTrackingEnabled = false
+            local trackingMethod = "Predictive"  -- 默认追踪方法
+            local hitRate = 100                  -- 默认命中率100%
+            local wallPenetration = false        -- 默认不穿墙
+            local showTargetInfo = true          -- 默认显示目标信息
+            local aimMode = "Distance"           -- 默认距离瞄准
+            local showTargetLine = true          -- 默认显示目标线条
+            local maxDistance = 300              -- 默认最大距离300米
+            local autoFire = false               -- 自动开火
+            local fireCooldown = 0.2             -- 开火冷却时间
             
-            for _, plr in ipairs(Players:GetPlayers()) do
-                if plr == localPlayer then continue end
-                if aimbotCheckTeam and plr.Team and plr.Team == localPlayer.Team then continue end
+            -- 追踪方法列表 (9种)
+            local trackingMethods = {
+                "Linear",            -- 1. 直线追踪
+                "Predictive",        -- 2. 预测追踪
+                "Curved",            -- 3. 曲线追踪
+                "Homing",            -- 4. 制导追踪
+                "Randomized",        -- 5. 随机扰动
+                "LagCompensated",    -- 6. 延迟补偿
+                "HeatSeeking",       -- 7. 热追踪
+                "Bouncing",          -- 8. 弹跳追踪
+                "Teleporting"        -- 9. 瞬移追踪
+            }
+            
+            -- 目标信息显示
+            local targetInfo = Drawing.new("Text")
+            targetInfo.Visible = false
+            targetInfo.Size = 18
+            targetInfo.Color = Color3.new(1, 1, 1)
+            targetInfo.Outline = true
+            targetInfo.OutlineColor = Color3.new(0, 0, 0)
+            targetInfo.Position = Vector2.new(10, 10)
+            targetInfo.Text = "目标: 无"
+            
+            -- 目标线条
+            local targetLine = Drawing.new("Line")
+            targetLine.Visible = false
+            targetLine.Thickness = 2
+            targetLine.Color = Color3.fromRGB(255, 50, 50)
+            targetLine.ZIndex = 10
+            
+            -- 获取当前目标
+            local function getTrackingTarget()
+                local closest, minDist = nil, math.huge
+                local camera = workspace.CurrentCamera
+                local localPlayer = game.Players.LocalPlayer
+                local mousePos = game:GetService("UserInputService"):GetMouseLocation()
+                local center = Vector2.new(camera.ViewportSize.X/2, camera.ViewportSize.Y/2)
                 
-                local char = plr.Character
-                if not char then continue end
-                
-                local root = char:FindFirstChild("HumanoidRootPart")
-                local head = char:FindFirstChild("Head")
-                if not (root and head) then continue end
-                
-                -- 计算位置
-                local pos = head.Position
-                local screenPos = camera:WorldToViewportPoint(pos)
-                if screenPos.Z <= 0 then continue end
-                
-                -- 检查距离
-                local distance = (root.Position - camera.CFrame.Position).Magnitude
-                if aimMode == "Distance" and distance > maxDistance then continue end
-                
-                -- 检查是否在FOV内
-                local screenVec = Vector2.new(screenPos.X, screenPos.Y)
-                local distToCenter = (screenVec - center).Magnitude
-                
-                if aimMode == "Crosshair" and distToCenter > fixedFOV then
-                    continue
-                end
-                
-                -- 墙体检测
-                if not wallPenetration then
-                    local ignoreList = {localPlayer.Character, camera}
-                    local origin = camera.CFrame.Position
-                    local direction = (pos - origin).Unit
-                    local ray = Ray.new(origin, direction * (origin - pos).Magnitude)
-                    local part = workspace:FindPartOnRayWithIgnoreList(ray, ignoreList)
-                    if part and not part:IsDescendantOf(char) then continue end
-                end
-                
-                -- 选择最近目标
-                local dist = (aimMode == "Distance") and distance or distToCenter
-                if dist < minDist then
-                    minDist, closest = dist, plr
-                end
-            end
-            
-            return closest
-        end
-        
-        -- 应用命中率
-        local function applyHitRate(success)
-            if hitRate >= 100 then return success end
-            if hitRate <= 0 then return false end
-            
-            local chance = math.random(1, 100)
-            if chance <= hitRate then
-                return success
-            end
-            return false
-        end
-        
-        -- 追踪方法实现
-        local function applyTrackingMethod(targetChar, bullet)
-            if not targetChar then return end
-            
-            local head = targetChar:FindFirstChild("Head")
-            local root = targetChar:FindFirstChild("HumanoidRootPart")
-            if not (head and root) then return end
-            
-            local targetPos = head.Position
-            
-            -- 根据追踪方法调整目标位置
-            if trackingMethod == "Predictive" then
-                -- 预测目标移动
-                local velocity = root.Velocity
-                local distance = (targetPos - bullet.Position).Magnitude
-                local timeToTarget = distance / 1000  -- 假设子弹速度1000m/s
-                targetPos = targetPos + velocity * timeToTarget
-            
-            elseif trackingMethod == "Curved" then
-                -- 曲线追踪
-                local direction = (targetPos - bullet.Position).Unit
-                local curveAmount = 0.3
-                local curveDirection = Vector3.new(math.random(-100,100)/100, math.random(50,100)/100, math.random(-100,100)/100).Unit
-                targetPos = targetPos + direction * curveAmount + curveDirection * curveAmount * 0.5
-            
-            elseif trackingMethod == "Homing" then
-                -- 制导追踪 (逐步调整方向)
-                if bullet:FindFirstChild("LastTargetPos") then
-                    local lastPos = bullet.LastTargetPos.Value
-                    local direction = (targetPos - lastPos).Unit * 5
-                    targetPos = targetPos + direction
-                end
-                
-                -- 保存当前位置供下一帧使用
-                if not bullet:FindFirstChild("LastTargetPos") then
-                    local value = Instance.new("Vector3Value")
-                    value.Name = "LastTargetPos"
-                    value.Value = targetPos
-                    value.Parent = bullet
-                else
-                    bullet.LastTargetPos.Value = targetPos
-                end
-            
-            elseif trackingMethod == "Randomized" then
-                -- 随机扰动
-                local randomOffset = Vector3.new(
-                    math.random(-100,100)/100,
-                    math.random(-50,50)/100,
-                    math.random(-100,100)/100
-                ) * 2
-                targetPos = targetPos + randomOffset
-            
-            elseif trackingMethod == "LagCompensated" then
-                -- 延迟补偿
-                local ping = 0.1  -- 假设100ms延迟
-                targetPos = targetPos + root.Velocity * ping
-            
-            elseif trackingMethod == "HeatSeeking" then
-                -- 热追踪 (忽略障碍)
-                -- 这里不需要额外处理，因为已经处理了穿墙
-            
-            elseif trackingMethod == "Bouncing" then
-                -- 弹跳追踪 (模拟弹道)
-                local direction = (targetPos - bullet.Position).Unit
-                local upVector = Vector3.new(0, 1, 0)
-                targetPos = targetPos + direction * 0.7 + upVector * 0.3
-            
-            elseif trackingMethod == "Teleporting" then
-                -- 瞬移追踪 (直接传送到目标)
-                bullet.CFrame = CFrame.new(targetPos)
-                return true
-            end
-            
-            -- 默认直线追踪
-            local direction = (targetPos - bullet.Position).Unit
-            bullet.CFrame = CFrame.new(bullet.Position, bullet.Position + direction)
-            return true
-        end
-        
-        -- 显示目标信息
-        local function updateTargetInfo(target)
-            if not bulletTrackingEnabled or not showTargetInfo then
-                targetInfo.Visible = false
-                return
-            end
-            
-            if target then
-                targetInfo.Text = "目标: " .. target.Name
-                targetInfo.Visible = true
-            else
-                targetInfo.Visible = false
-            end
-        end
-        
-        -- 显示目标线条
-        local function updateTargetLine(target)
-            if not bulletTrackingEnabled or not showTargetLine then
-                targetLine.Visible = false
-                return
-            end
-            
-            local camera = workspace.CurrentCamera
-            if target and target.Character then
-                local root = target.Character:FindFirstChild("HumanoidRootPart")
-                if root then
-                    local targetPos = root.Position
-                    local screenPos = camera:WorldToViewportPoint(targetPos)
-                    if screenPos.Z > 0 then
-                        local center = Vector2.new(camera.ViewportSize.X/2, camera.ViewportSize.Y/2)
-                        targetLine.From = center
-                        targetLine.To = Vector2.new(screenPos.X, screenPos.Y)
-                        targetLine.Visible = true
-                        return
+                for _, plr in ipairs(game:GetService("Players"):GetPlayers()) do
+                    if plr == localPlayer then continue end
+                    
+                    local char = plr.Character
+                    if not char then continue end
+                    
+                    local root = char:FindFirstChild("HumanoidRootPart")
+                    local head = char:FindFirstChild("Head")
+                    if not (root and head) then continue end
+                    
+                    -- 计算位置
+                    local pos = head.Position
+                    local screenPos = camera:WorldToViewportPoint(pos)
+                    if screenPos.Z <= 0 then continue end
+                    
+                    -- 检查距离
+                    local distance = (root.Position - camera.CFrame.Position).Magnitude
+                    if distance > maxDistance then continue end
+                    
+                    -- 检查是否在屏幕范围内
+                    local screenVec = Vector2.new(screenPos.X, screenPos.Y)
+                    local distToCenter = (screenVec - center).Magnitude
+                    
+                    -- 墙体检测
+                    if not wallPenetration then
+                        local ignoreList = {localPlayer.Character, camera}
+                        local origin = camera.CFrame.Position
+                        local direction = (pos - origin).Unit
+                        local ray = Ray.new(origin, direction * (origin - pos).Magnitude)
+                        local part = workspace:FindPartOnRayWithIgnoreList(ray, ignoreList)
+                        if part and not part:IsDescendantOf(char) then continue end
+                    end
+                    
+                    -- 选择最近目标
+                    local dist = distance
+                    if dist < minDist then
+                        minDist, closest = dist, plr
                     end
                 end
+                
+                return closest
             end
-            targetLine.Visible = false
-        end
-        
-        -- 子弹追踪主循环
-        local trackingLoop
-        local function startBulletTracking()
-            if trackingLoop then return end
             
-            trackingLoop = game:GetService("RunService").Heartbeat:Connect(function()
-                if not bulletTrackingEnabled then
-                    updateTargetInfo(nil)
-                    updateTargetLine(nil)
+            -- 应用命中率
+            local function applyHitRate(success)
+                if hitRate >= 100 then return success end
+                if hitRate <= 0 then return false end
+                
+                local chance = math.random(1, 100)
+                if chance <= hitRate then
+                    return success
+                end
+                return false
+            end
+            
+            -- 追踪方法实现
+            local function applyTrackingMethod(targetChar, origin)
+                if not targetChar then return nil end
+                
+                local head = targetChar:FindFirstChild("Head")
+                local root = targetChar:FindFirstChild("HumanoidRootPart")
+                if not (head and root) then return nil end
+                
+                local targetPos = head.Position
+                
+                -- 根据追踪方法调整目标位置
+                if trackingMethod == "Predictive" then
+                    -- 预测目标移动
+                    local velocity = root.Velocity
+                    local distance = (targetPos - origin).Magnitude
+                    local timeToTarget = distance / 1000  -- 假设子弹速度1000m/s
+                    targetPos = targetPos + velocity * timeToTarget
+                
+                elseif trackingMethod == "Curved" then
+                    -- 曲线追踪
+                    local direction = (targetPos - origin).Unit
+                    local curveAmount = 0.3
+                    local curveDirection = Vector3.new(math.random(-100,100)/100, math.random(50,100)/100, math.random(-100,100)/100).Unit
+                    targetPos = targetPos + direction * curveAmount + curveDirection * curveAmount * 0.5
+                
+                elseif trackingMethod == "Homing" then
+                    -- 制导追踪 (逐步调整方向)
+                    -- 在通用方法中，我们返回目标位置，由调用者处理
+                
+                elseif trackingMethod == "Randomized" then
+                    -- 随机扰动
+                    local randomOffset = Vector3.new(
+                        math.random(-100,100)/100,
+                        math.random(-50,50)/100,
+                        math.random(-100,100)/100
+                    ) * 2
+                    targetPos = targetPos + randomOffset
+                
+                elseif trackingMethod == "LagCompensated" then
+                    -- 延迟补偿
+                    local ping = 0.1  -- 假设100ms延迟
+                    targetPos = targetPos + root.Velocity * ping
+                
+                elseif trackingMethod == "HeatSeeking" then
+                    -- 热追踪 (忽略障碍)
+                    -- 这里不需要额外处理
+                
+                elseif trackingMethod == "Bouncing" then
+                    -- 弹跳追踪 (模拟弹道)
+                    local direction = (targetPos - origin).Unit
+                    local upVector = Vector3.new(0, 1, 0)
+                    targetPos = targetPos + direction * 0.7 + upVector * 0.3
+                
+                elseif trackingMethod == "Teleporting" then
+                    -- 瞬移追踪 (直接传送到目标)
+                    return targetPos
+                end
+                
+                return targetPos
+            end
+            
+            -- 显示目标信息
+            local function updateTargetInfo(target)
+                if not bulletTrackingEnabled or not showTargetInfo then
+                    targetInfo.Visible = false
                     return
                 end
+                
+                if target then
+                    targetInfo.Text = "目标: " .. target.Name
+                    targetInfo.Visible = true
+                else
+                    targetInfo.Visible = false
+                end
+            end
+            
+            -- 显示目标线条
+            local function updateTargetLine(target)
+                if not bulletTrackingEnabled or not showTargetLine then
+                    targetLine.Visible = false
+                    return
+                end
+                
+                local camera = workspace.CurrentCamera
+                if target and target.Character then
+                    local root = target.Character:FindFirstChild("HumanoidRootPart")
+                    if root then
+                        local targetPos = root.Position
+                        local screenPos = camera:WorldToViewportPoint(targetPos)
+                        if screenPos.Z > 0 then
+                            local center = Vector2.new(camera.ViewportSize.X/2, camera.ViewportSize.Y/2)
+                            targetLine.From = center
+                            targetLine.To = Vector2.new(screenPos.X, screenPos.Y)
+                            targetLine.Visible = true
+                            return
+                        end
+                    end
+                end
+                targetLine.Visible = false
+            end
+            
+            -- 通用射击函数（不依赖武器系统）
+            local function fireAtTarget()
+                if not bulletTrackingEnabled then return end
                 
                 local target = getTrackingTarget()
                 updateTargetInfo(target)
                 updateTargetLine(target)
                 
-                -- 实际追踪逻辑在武器开火时应用
-            end)
-        end
-        
-        local function stopBulletTracking()
-            if trackingLoop then
-                trackingLoop:Disconnect()
-                trackingLoop = nil
-            end
-            targetInfo.Visible = false
-            targetLine.Visible = false
-        end
-        
-        -- 监听武器开火事件
-        local function onWeaponFired(weapon, bullet)
-            if not bulletTrackingEnabled then return end
-            
-            local target = getTrackingTarget()
-            if not target or not target.Character then return end
-            
-            -- 应用追踪方法
-            local success = applyTrackingMethod(target.Character, bullet)
-            
-            -- 应用命中率
-            if not applyHitRate(success) then
-                -- 未命中，重置子弹方向
+                if not target or not target.Character then return end
+                
                 local camera = workspace.CurrentCamera
-                local direction = camera.CFrame.LookVector
-                bullet.CFrame = CFrame.new(bullet.Position, bullet.Position + direction)
+                local origin = camera.CFrame.Position
+                
+                -- 应用追踪方法
+                local targetPos = applyTrackingMethod(target.Character, origin)
+                if not targetPos then return end
+                
+                -- 应用命中率
+                if not applyHitRate(true) then
+                    -- 未命中，随机偏移目标
+                    targetPos = targetPos + Vector3.new(
+                        math.random(-3, 3),
+                        math.random(-1, 1),
+                        math.random(-3, 3)
+                    )
+                end
+                
+                -- 计算方向
+                local direction = (targetPos - origin).Unit
+                
+                -- 创建视觉子弹效果
+                local bullet = Instance.new("Part")
+                bullet.Size = Vector3.new(0.2, 0.2, 2)
+                bullet.Material = Enum.Material.Neon
+                bullet.Color = Color3.fromRGB(255, 50, 50)
+                bullet.CanCollide = false
+                bullet.Anchored = true
+                bullet.CFrame = CFrame.new(origin, origin + direction)
+                bullet.Parent = workspace
+                
+                -- 移动子弹
+                local speed = 1000
+                local distance = (targetPos - origin).Magnitude
+                local duration = distance / speed
+                
+                local startTime = tick()
+                local connection
+                connection = game:GetService("RunService").Heartbeat:Connect(function()
+                    local elapsed = tick() - startTime
+                    local progress = math.min(elapsed / duration, 1)
+                    
+                    bullet.CFrame = CFrame.new(origin + direction * distance * progress, origin + direction * distance * progress + direction)
+                    
+                    -- 检查命中
+                    if progress >= 1 then
+                        connection:Disconnect()
+                        bullet:Destroy()
+                    end
+                end)
             end
-        end
-        
-        -- 检测武器系统
-        local function findWeaponSystem()
-            -- 尝试检测常见的武器系统
-            local character = game.Players.LocalPlayer.Character
-            if not character then return end
             
-            -- 检测标准武器控制器
-            local tool = character:FindFirstChildOfClass("Tool")
-            if tool then
-                local remote = tool:FindFirstChild("FireServer", true)
-                if remote and remote:IsA("RemoteEvent") then
-                    return tool, remote
+            -- 自动开火功能
+            local autoFireConnection
+            local function startAutoFire()
+                if autoFireConnection then return end
+                
+                autoFireConnection = game:GetService("RunService").Heartbeat:Connect(function()
+                    if not autoFire then return end
+                    
+                    fireAtTarget()
+                    wait(fireCooldown)
+                end)
+            end
+            
+            local function stopAutoFire()
+                if autoFireConnection then
+                    autoFireConnection:Disconnect()
+                    autoFireConnection = nil
                 end
             end
             
-            -- 检测模块化武器系统
-            local weaponsFolder = workspace:FindFirstChild("Weapons")
-            if weaponsFolder then
-                for _, weapon in ipairs(weaponsFolder:GetChildren()) do
-                    if weapon:FindFirstChild("Fire") then
-                        return weapon, weapon.Fire
+            -- 手机开火按钮
+            local fireButton
+            local function createMobileFireButton()
+                if not isMobile then return end
+                
+                -- 创建开火按钮
+                fireButton = Instance.new("TextButton")
+                fireButton.Size = UDim2.new(0, 100, 0, 100)
+                fireButton.Position = UDim2.new(1, -120, 1, -120)
+                fireButton.AnchorPoint = Vector2.new(1, 1)
+                fireButton.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
+                fireButton.Text = "开火"
+                fireButton.TextSize = 24
+                fireButton.TextColor3 = Color3.new(1, 1, 1)
+                fireButton.Parent = game:GetService("CoreGui")
+                
+                -- 按钮事件
+                fireButton.MouseButton1Click:Connect(function()
+                    fireAtTarget()
+                end)
+                
+                fireButton.MouseButton1Down:Connect(function()
+                    if autoFire then
+                        startAutoFire()
+                    end
+                end)
+                
+                fireButton.MouseButton1Up:Connect(function()
+                    stopAutoFire()
+                end)
+            end
+            
+            -- PC开火绑定
+            local function setupPCFire()
+                if isMobile then return end
+                
+                local inputService = game:GetService("UserInputService")
+                
+                -- 鼠标点击开火
+                inputService.InputBegan:Connect(function(input)
+                    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                        fireAtTarget()
+                    end
+                end)
+                
+                -- 键盘按键开火
+                inputService.InputBegan:Connect(function(input)
+                    if input.KeyCode == Enum.KeyCode.F then
+                        fireAtTarget()
+                    end
+                end)
+            end
+            
+            -- 子弹追踪主循环
+            local trackingLoop
+            local function startBulletTracking()
+                if trackingLoop then return end
+                
+                trackingLoop = game:GetService("RunService").Heartbeat:Connect(function()
+                    if not bulletTrackingEnabled then
+                        updateTargetInfo(nil)
+                        updateTargetLine(nil)
+                        return
+                    end
+                    
+                    local target = getTrackingTarget()
+                    updateTargetInfo(target)
+                    updateTargetLine(target)
+                end)
+            end
+            
+            local function stopBulletTracking()
+                if trackingLoop then
+                    trackingLoop:Disconnect()
+                    trackingLoop = nil
+                end
+                targetInfo.Visible = false
+                targetLine.Visible = false
+            end
+            
+            -----------------------------------------------------------------
+            -- 子弹追踪UI (添加到人物功能Tab)
+            -----------------------------------------------------------------
+            local bulletTrackingSec = Tab4:AddSection({Name = "子弹追踪系统"})
+            
+            -- 开关
+            bulletTrackingSec:AddToggle({
+                Name = "启用子弹追踪",
+                Default = false,
+                Callback = function(v)
+                    bulletTrackingEnabled = v
+                    if v then
+                        startBulletTracking()
+                        if isMobile then
+                            createMobileFireButton()
+                        else
+                            setupPCFire()
+                        end
+                    else
+                        stopBulletTracking()
+                        if fireButton then
+                            fireButton:Destroy()
+                            fireButton = nil
+                        end
+                        stopAutoFire()
                     end
                 end
-            end
-            
-            return nil
-        end
-        
-        -- 初始化武器监听
-        local weaponHook
-        local function hookWeaponSystem()
-            if weaponHook then weaponHook:Disconnect() end
-            
-            local weapon, fireEvent = findWeaponSystem()
-            if not weapon then
-                OrionLib:MakeNotification({
-                    Name = "武器系统",
-                    Content = "未检测到武器系统，子弹追踪可能无效",
-                    Time = 5
-                })
-                return
-            end
-            
-            weaponHook = fireEvent.OnClientEvent:Connect(function(bullet)
-                onWeaponFired(weapon, bullet)
-            end)
-            
-            OrionLib:MakeNotification({
-                Name = "武器系统",
-                Content = "已连接到武器系统: " .. weapon.Name,
-                Time = 3
             })
-        end
-        
-        -- 角色变化时重新连接武器系统
-        game.Players.LocalPlayer.CharacterAdded:Connect(function()
-            task.wait(1)  -- 等待武器加载
-            hookWeaponSystem()
-        end)
-        
-        -----------------------------------------------------------------
-        -- 子弹追踪UI (添加到人物功能Tab)
-        -----------------------------------------------------------------
-        local bulletTrackingSec = Tab4:AddSection({Name = "子弹追踪系统"})
-        
-        -- 开关
-        bulletTrackingSec:AddToggle({
-            Name = "启用子弹追踪",
-            Default = false,
-            Callback = function(v)
-                bulletTrackingEnabled = v
-                if v then
-                    startBulletTracking()
-                    hookWeaponSystem()
-                else
-                    stopBulletTracking()
+            
+            -- 追踪方法选择
+            bulletTrackingSec:AddDropdown({
+                Name = "追踪方法",
+                Default = trackingMethod,
+                Options = trackingMethods,
+                Callback = function(value)
+                    trackingMethod = value
                 end
-            end
-        })
-        
-        -- 追踪方法选择
-        bulletTrackingSec:AddDropdown({
-            Name = "追踪方法",
-            Default = trackingMethod,
-            Options = trackingMethods,
-            Callback = function(value)
-                trackingMethod = value
-            end
-        })
-        
-        -- 命中率调节
-        local hitRateSlider = bulletTrackingSec:AddSlider({
-            Name = "命中率 (%)",
-            Min = 0,
-            Max = 100,
-            Default = hitRate,
-            Increment = 1,
-            Callback = function(value)
-                hitRate = value
-            end
-        })
-        
-        bulletTrackingSec:AddTextbox({
-            Name = "命中率输入",
-            Default = tostring(hitRate),
-            Callback = function(txt)
-                local num = tonumber(txt)
-                if num then
-                    num = math.clamp(num, 0, 100)
-                    hitRate = num
-                    hitRateSlider:Set(num)
+            })
+            
+            -- 命中率调节
+            local hitRateSlider = bulletTrackingSec:AddSlider({
+                Name = "命中率 (%)",
+                Min = 0,
+                Max = 100,
+                Default = hitRate,
+                Increment = 1,
+                Callback = function(value)
+                    hitRate = value
                 end
-            end
-        })
-        
-        -- 穿墙开关
-        bulletTrackingSec:AddToggle({
-            Name = "子弹穿墙",
-            Default = wallPenetration,
-            Callback = function(v)
-                wallPenetration = v
-            end
-        })
-        
-        -- 显示目标信息开关
-        bulletTrackingSec:AddToggle({
-            Name = "显示目标信息",
-            Default = showTargetInfo,
-            Callback = function(v)
-                showTargetInfo = v
-                if not v then
-                    targetInfo.Visible = false
+            })
+            
+            bulletTrackingSec:AddTextbox({
+                Name = "命中率输入",
+                Default = tostring(hitRate),
+                Callback = function(txt)
+                    local num = tonumber(txt)
+                    if num then
+                        num = math.clamp(num, 0, 100)
+                        hitRate = num
+                        hitRateSlider:Set(num)
+                    end
                 end
-            end
-        })
-        
-        -- 瞄准方式选择
-        bulletTrackingSec:AddDropdown({
-            Name = "瞄准方式",
-            Default = aimMode,
-            Options = {"Distance", "Crosshair"},
-            Callback = function(value)
-                aimMode = value
-            end
-        })
-        
-        -- 显示目标线条开关
-        bulletTrackingSec:AddToggle({
-            Name = "显示目标线条",
-            Default = showTargetLine,
-            Callback = function(v)
-                showTargetLine = v
-                if not v then
-                    targetLine.Visible = false
+            })
+            
+            -- 穿墙开关
+            bulletTrackingSec:AddToggle({
+                Name = "子弹穿墙",
+                Default = wallPenetration,
+                Callback = function(v)
+                    wallPenetration = v
                 end
-            end
-        })
-        
-        -- 最大距离设置
-        local distanceSlider = bulletTrackingSec:AddSlider({
-            Name = "最大距离 (米)",
-            Min = 10,
-            Max = 100000000,
-            Default = maxDistance,
-            Increment = 10,
-            Callback = function(value)
-                maxDistance = value
-            end
-        })
-        
-        bulletTrackingSec:AddTextbox({
-            Name = "最大距离输入",
-            Default = tostring(maxDistance),
-            Callback = function(txt)
-                local num = tonumber(txt)
-                if num then
-                    num = math.clamp(num, 10, 100000000)
-                    maxDistance = num
-                    distanceSlider:Set(num)
+            })
+            
+            -- 显示目标信息开关
+            bulletTrackingSec:AddToggle({
+                Name = "显示目标信息",
+                Default = showTargetInfo,
+                Callback = function(v)
+                    showTargetInfo = v
+                    if not v then
+                        targetInfo.Visible = false
+                    end
                 end
+            })
+            
+            -- 显示目标线条开关
+            bulletTrackingSec:AddToggle({
+                Name = "显示目标线条",
+                Default = showTargetLine,
+                Callback = function(v)
+                    showTargetLine = v
+                    if not v then
+                        targetLine.Visible = false
+                    end
+                end
+            })
+            
+            -- 最大距离设置
+            local distanceSlider = bulletTrackingSec:AddSlider({
+                Name = "最大距离 (米)",
+                Min = 10,
+                Max = 1000,
+                Default = maxDistance,
+                Increment = 10,
+                Callback = function(value)
+                    maxDistance = value
+                end
+            })
+            
+            bulletTrackingSec:AddTextbox({
+                Name = "最大距离输入",
+                Default = tostring(maxDistance),
+                Callback = function(txt)
+                    local num = tonumber(txt)
+                    if num then
+                        num = math.clamp(num, 10, 1000)
+                        maxDistance = num
+                        distanceSlider:Set(num)
+                    end
+                end
+            })
+            
+            -- 自动开火设置
+            bulletTrackingSec:AddToggle({
+                Name = "自动开火",
+                Default = autoFire,
+                Callback = function(v)
+                    autoFire = v
+                    if v then
+                        startAutoFire()
+                    else
+                        stopAutoFire()
+                    end
+                end
+            })
+            
+            local fireCooldownSlider = bulletTrackingSec:AddSlider({
+                Name = "开火间隔 (秒)",
+                Min = 0.1,
+                Max = 2,
+                Default = fireCooldown,
+                Increment = 0.1,
+                Callback = function(value)
+                    fireCooldown = value
+                end
+            })
+            
+            -- 添加说明
+            bulletTrackingSec:AddParagraph("注意", "此子弹追踪系统不依赖游戏武器系统，兼容手机玩家")
+            if isMobile then
+                bulletTrackingSec:AddParagraph("手机提示", "使用右下角的开火按钮进行射击")
+            else
+                bulletTrackingSec:AddParagraph("PC提示", "使用鼠标左键或F键进行射击")
             end
-        })
-        
-        -- 添加说明
-        bulletTrackingSec:AddParagraph("注意", "子弹追踪功能需要游戏中有可检测的武器系统")
-        
-        -- ... (其他代码保持不变) ...
-        
-        --VR脚本 Tap
-            local Tab2 = Window:MakeTab({Name = "VR", Icon = "rbxassetid://7733779610"})
-            Tab2:AddButton({Name = "FEVR脚本", Callback = function()
-                loadstring(game:HttpGet("https://raw.githubusercontent.com/randomstring0/Qwerty/refs/heads/main/qwerty45.lua"))()
-            end})
+
 
         --控制台 Tap
             local Tab3 = Window:MakeTab({Name = "控制台", Icon = "rbxassetid://7733779610"})
