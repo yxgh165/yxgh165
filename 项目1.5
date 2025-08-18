@@ -1,1185 +1,998 @@
 (function()
-    -- 强制 200×200 居中窗口
-    getgenv().WindowSize = UDim2.new(0, 200, 0, 200)
-    
-    -- 黑色 OrionLib UI
-    local OrionLib = loadstring(game:HttpGet("https://raw.githubusercontent.com/wsomoQaz/lua-/main/Xcccc"))()
-    
-    -- 卡密系统配置
-    local KeySystem = {
-        CurrentKey = nil,
-        IsVerified = false,
-        KeyFile = "StitchKey.txt",
-        DiscordWebhook = "https://discord.com/api/webhooks/你的webhook地址", -- 可选：用于记录卡密使用
-        ValidKeys = {
-            "2025",
-            "666",
-            "KUNKUN666",
-            "666free",
-            "TAIYOUYISILE"
+    -- 添加错误处理
+    local success, err = pcall(function()
+        -- 强制 200×200 居中窗口
+        getgenv().WindowSize = UDim2.new(0, 200, 0, 200)
+        
+        -- 使用更可靠的OrionLib加载源
+        local OrionLib = loadstring(game:HttpGet("https://raw.githubusercontent.com/shlexware/Orion/main/source"))()
+        
+        -- 卡密系统配置
+        local KeySystem = {
+            CurrentKey = nil,
+            IsVerified = false,
+            KeyFile = "StitchKey.txt",
+            DiscordWebhook = "https://discord.com/api/webhooks/你的webhook地址", -- 可选：用于记录卡密使用
+            ValidKeys = {
+                "2025",
+                "666",
+                "KUNKUN666",
+                "666free",
+                "TAIYOUYISILE"
+            }
         }
-    }
-    
-    -- 纯黑主题
-    OrionLib.Themes.Default = {
-        Main    = Color3.fromRGB(20,20,20),
-        Second  = Color3.fromRGB(30,30,30),
-        Stroke  = Color3.fromRGB(50,50,50),
-        Divider = Color3.fromRGB(40,40,40),
-        Text    = Color3.fromRGB(255,255,255),
-        TextDark= Color3.fromRGB(200,200,200)
-    }
-    OrionLib.SelectedTheme = "Default"
-    
-    -- 保存卡密到文件
-    local function SaveKey(key)
-        if writefile then
-            writefile(KeySystem.KeyFile, key)
-        end
-    end
-    
-    -- 从文件读取卡密
-    local function LoadKey()
-        if isfile and isfile(KeySystem.KeyFile) then
-            return readfile(KeySystem.KeyFile)
-        end
-        return nil
-    end
-    
-    -- 验证卡密
-    local function VerifyKey(key)
-        if not key or key == "" then return false end
         
-        -- 检查是否在有效卡密列表中
-        for _, validKey in ipairs(KeySystem.ValidKeys) do
-            if key == validKey then
-                return true
+        -- 纯黑主题
+        OrionLib.Themes.Default = {
+            Main    = Color3.fromRGB(20,20,20),
+            Second  = Color3.fromRGB(30,30,30),
+            Stroke  = Color3.fromRGB(50,50,50),
+            Divider = Color3.fromRGB(40,40,40),
+            Text    = Color3.fromRGB(255,255,255),
+            TextDark= Color3.fromRGB(200,200,200)
+        }
+        OrionLib.SelectedTheme = "Default"
+        
+        -- 保存卡密到文件
+        local function SaveKey(key)
+            if writefile then
+                writefile(KeySystem.KeyFile, key)
             end
         end
         
-        -- 可选：发送到Discord记录
-        if syn and KeySystem.DiscordWebhook ~= "https://discord.com/api/webhooks/你的webhook地址" then
-            syn.request({
-                Url = KeySystem.DiscordWebhook,
-                Method = "POST",
-                Headers = {
-                    ["Content-Type"] = "application/json"
-                },
-                Body = game:GetService("HttpService"):JSONEncode({
-                    content = "尝试使用无效卡密: " .. key,
-                    username = "Key System Logger"
-                })
-            })
-        end
-        
-        return false
-    end
-    
-    -- 复制到剪贴板函数（兼容多种执行器）
-    local function CopyToClipboard(text)
-        if setclipboard then
-            setclipboard(text)
-            return true
-        elseif writeclipboard then
-            writeclipboard(text)
-            return true
-        elseif toclipboard then
-            toclipboard(text)
-            return true
-        else
-            -- 对于不支持剪贴板的执行器，打印到控制台
-            print("[复制内容] " .. text)
-            return false
-        end
-    end
-    
-    -- 显示复制成功通知
-    local function ShowCopyNotification(success, content)
-        if success then
-            OrionLib:MakeNotification({
-                Name = "复制成功",
-                Content = "已复制到剪贴板: " .. content,
-                Time = 3
-            })
-        else
-            OrionLib:MakeNotification({
-                Name = "复制失败",
-                Content = "请手动复制控制台中的内容",
-                Time = 5
-            })
-        end
-    end
-
-    -- 显示卡密验证窗口
-    local function ShowKeyWindow()
-        local KeyWindow = OrionLib:MakeWindow({
-            Name = "卡密验证系统",
-            HidePremium = true,
-            SaveConfig = false,
-            IntroEnabled = false
-        })
-        
-        local KeyTab = KeyWindow:MakeTab({
-            Name = "验证",
-            Icon = "rbxassetid://4370345174"
-        })
-        
-        KeyTab:AddLabel("请输入您的卡密以继续使用脚本")
-        KeyTab:AddParagraph("注意", "卡密区分大小写，请确保输入正确")
-        
-        local KeyBox = KeyTab:AddTextbox({
-            Name = "输入卡密",
-            Default = "",
-            TextDisappear = false,
-            Callback = function(Value)
-                KeySystem.CurrentKey = Value
+        -- 从文件读取卡密
+        local function LoadKey()
+            if isfile and isfile(KeySystem.KeyFile) then
+                return readfile(KeySystem.KeyFile)
             end
-        })
+            return nil
+        end
         
-        KeyTab:AddButton({
-            Name = "验证卡密",
-            Callback = function()
-                if KeySystem.CurrentKey and VerifyKey(KeySystem.CurrentKey) then
-                    KeySystem.IsVerified = true
-                    SaveKey(KeySystem.CurrentKey)
-                    
-                    OrionLib:MakeNotification({
-                        Name = "验证成功",
-                        Content = "卡密验证通过，欢迎使用脚本！",
-                        Time = 3
-                    })
-                    
-                    KeyWindow:Destroy()
-                    
-                    -- 创建坤坤大帝脚本动画
-                    CreateKunKunAnimation()
-                    
-                    -- 延迟后显示主窗口
-                    wait(2.5)
-                    ShowMainWindow()
-                else
-                    OrionLib:MakeNotification({
-                        Name = "验证失败",
-                        Content = "卡密无效或已过期，请重试！",
-                        Time = 3
-                    })
+        -- 验证卡密
+        local function VerifyKey(key)
+            if not key or key == "" then return false end
+            
+            -- 检查是否在有效卡密列表中
+            for _, validKey in ipairs(KeySystem.ValidKeys) do
+                if key == validKey then
+                    return true
                 end
             end
-        })
+            
+            -- 可选：发送到Discord记录
+            if syn and KeySystem.DiscordWebhook ~= "https://discord.com/api/webhooks/你的webhook地址" then
+                syn.request({
+                    Url = KeySystem.DiscordWebhook,
+                    Method = "POST",
+                    Headers = {
+                        ["Content-Type"] = "application/json"
+                    },
+                    Body = game:GetService("HttpService"):JSONEncode({
+                        content = "尝试使用无效卡密: " .. key,
+                        username = "Key System Logger"
+                    })
+                })
+            end
+            
+            return false
+        end
         
-        KeyTab:AddButton({
-            Name = "获取卡密",
-            Callback = function()
-                -- 这里可以打开Discord邀请或其他获取方式
+        -- 复制到剪贴板函数（兼容多种执行器）
+        local function CopyToClipboard(text)
+            if setclipboard then
+                setclipboard(text)
+                return true
+            elseif writeclipboard then
+                writeclipboard(text)
+                return true
+            elseif toclipboard then
+                toclipboard(text)
+                return true
+            else
+                -- 对于不支持剪贴板的执行器，打印到控制台
+                print("[复制内容] " .. text)
+                return false
+            end
+        end
+        
+        -- 显示复制成功通知
+        local function ShowCopyNotification(success, content)
+            if success then
                 OrionLib:MakeNotification({
-                    Name = "获取卡密",
-                    Content = "请加入Discord: https://discord.gg/xVUf7H9M",
+                    Name = "复制成功",
+                    Content = "已复制到剪贴板: " .. content,
+                    Time = 3
+                })
+            else
+                OrionLib:MakeNotification({
+                    Name = "复制失败",
+                    Content = "请手动复制控制台中的内容",
                     Time = 5
                 })
             end
-        })
-        
-        -- 添加一键复制按钮
-        KeyTab:AddButton({
-            Name = "一键复制当前卡密",
-            Callback = function()
-                if KeySystem.CurrentKey and KeySystem.CurrentKey ~= "" then
-                    local success = CopyToClipboard(KeySystem.CurrentKey)
-                    ShowCopyNotification(success, KeySystem.CurrentKey)
-                else
+        end
+
+        -- 显示卡密验证窗口
+        local function ShowKeyWindow()
+            local KeyWindow = OrionLib:MakeWindow({
+                Name = "卡密验证系统",
+                HidePremium = true,
+                SaveConfig = false,
+                IntroEnabled = false
+            })
+            
+            local KeyTab = KeyWindow:MakeTab({
+                Name = "验证",
+                Icon = "rbxassetid://4370345174"
+            })
+            
+            KeyTab:AddLabel("请输入您的卡密以继续使用脚本")
+            KeyTab:AddParagraph("注意", "卡密区分大小写，请确保输入正确")
+            
+            local KeyBox = KeyTab:AddTextbox({
+                Name = "输入卡密",
+                Default = "",
+                TextDisappear = false,
+                Callback = function(Value)
+                    KeySystem.CurrentKey = Value
+                end
+            })
+            
+            KeyTab:AddButton({
+                Name = "验证卡密",
+                Callback = function()
+                    if KeySystem.CurrentKey and VerifyKey(KeySystem.CurrentKey) then
+                        KeySystem.IsVerified = true
+                        SaveKey(KeySystem.CurrentKey)
+                        
+                        OrionLib:MakeNotification({
+                            Name = "验证成功",
+                            Content = "卡密验证通过，欢迎使用脚本！",
+                            Time = 3
+                        })
+                        
+                        KeyWindow:Destroy()
+                        
+                        -- 创建坤坤大帝脚本动画
+                        CreateKunKunAnimation()
+                        
+                        -- 延迟后显示主窗口
+                        wait(2.5)
+                        ShowMainWindow()
+                    else
+                        OrionLib:MakeNotification({
+                            Name = "验证失败",
+                            Content = "卡密无效或已过期，请重试！",
+                            Time = 3
+                        })
+                    end
+                end
+            })
+            
+            KeyTab:AddButton({
+                Name = "获取卡密",
+                Callback = function()
+                    -- 这里可以打开Discord邀请或其他获取方式
                     OrionLib:MakeNotification({
-                        Name = "复制失败",
-                        Content = "当前没有卡密可复制",
-                        Time = 3
+                        Name = "获取卡密",
+                        Content = "请加入Discord: https://discord.gg/xVUf7H9M",
+                        Time = 5
                     })
                 end
+            })
+            
+            -- 添加一键复制按钮
+            KeyTab:AddButton({
+                Name = "一键复制当前卡密",
+                Callback = function()
+                    if KeySystem.CurrentKey and KeySystem.CurrentKey ~= "" then
+                        local success = CopyToClipboard(KeySystem.CurrentKey)
+                        ShowCopyNotification(success, KeySystem.CurrentKey)
+                    else
+                        OrionLib:MakeNotification({
+                            Name = "复制失败",
+                            Content = "当前没有卡密可复制",
+                            Time = 3
+                        })
+                    end
+                end
+            })
+            
+            -- 添加一键复制Discord链接按钮
+            KeyTab:AddButton({
+                Name = "一键复制Discord链接",
+                Callback = function()
+                    local discordLink = "https://discord.gg/xVUf7H9M"
+                    local success = CopyToClipboard(discordLink)
+                    ShowCopyNotification(success, discordLink)
+                end
+            })
+            
+            -- 自动填充已保存的卡密
+            local savedKey = LoadKey()
+            if savedKey then
+                KeyBox:Set(savedKey)
+                KeySystem.CurrentKey = savedKey
             end
-        })
-        
-        -- 添加一键复制Discord链接按钮
-        KeyTab:AddButton({
-            Name = "一键复制Discord链接",
-            Callback = function()
-                local discordLink = "https://discord.gg/xVUf7H9M"
-                local success = CopyToClipboard(discordLink)
-                ShowCopyNotification(success, discordLink)
-            end
-        })
-        
-        -- 自动填充已保存的卡密
-        local savedKey = LoadKey()
-        if savedKey then
-            KeyBox:Set(savedKey)
-            KeySystem.CurrentKey = savedKey
         end
-    end
-    
--- 坤坤大帝脚本弹性动画 (5秒版本)
-local function CreateKunKunAnimation()
-    -- 创建全屏背景
-    local bg = Drawing.new("Square")
-    bg.Size = workspace.CurrentCamera.ViewportSize
-    bg.Position = Vector2.new(0, 0)
-    bg.Color = Color3.new(0, 0, 0)
-    bg.Filled = true
-    bg.Transparency = 1
-    bg.Visible = true
-    bg.ZIndex = 999
-    
-    -- 创建坤坤大帝文字
-    local text = Drawing.new("Text")
-    text.Text = "坤坤大帝脚本"
-    text.Size = 100
-    text.Center = true
-    text.Position = Vector2.new(workspace.CurrentCamera.ViewportSize.X/2, -200) -- 初始位置在屏幕上方
-    text.Color = Color3.new(1, 0.2, 0.2)
-    text.Outline = true
-    text.OutlineColor = Color3.new(1, 1, 1)
-    text.Transparency = 0
-    text.Visible = true
-    text.ZIndex = 1000
-    
-    -- 创建副标题
-    local subText = Drawing.new("Text")
-    subText.Text = "尊享特权版 - 启动成功"
-    subText.Size = 40
-    subText.Center = true
-    subText.Position = Vector2.new(workspace.CurrentCamera.ViewportSize.X/2, -100) -- 初始位置在屏幕上方
-    subText.Color = Color3.new(0.8, 0.8, 1)
-    subText.Outline = true
-    subText.OutlineColor = Color3.new(0.2, 0.2, 0.2)
-    subText.Transparency = 0
-    subText.Visible = true
-    subText.ZIndex = 1000
-    
-    -- 弹性动画函数 (模拟弹簧物理效果)
-    local function elasticAnimation(obj, targetY, duration)
-        local startY = obj.Position.Y
-        local startTime = tick()
-        local damping = 0.7 -- 阻尼系数 (0-1)
-        local stiffness = 0.3 -- 弹性系数
         
-        local connection
-        connection = game:GetService("RunService").RenderStepped:Connect(function()
-            local elapsed = tick() - startTime
-            local progress = elapsed / duration
+    -- 坤坤大帝脚本弹性动画 (5秒版本)
+    local function CreateKunKunAnimation()
+        -- 创建全屏背景
+        local bg = Drawing.new("Square")
+        bg.Size = workspace.CurrentCamera.ViewportSize
+        bg.Position = Vector2.new(0, 0)
+        bg.Color = Color3.new(0, 0, 0)
+        bg.Filled = true
+        bg.Transparency = 1
+        bg.Visible = true
+        bg.ZIndex = 999
+        
+        -- 创建坤坤大帝文字
+        local text = Drawing.new("Text")
+        text.Text = "坤坤大帝脚本"
+        text.Size = 100
+        text.Center = true
+        text.Position = Vector2.new(workspace.CurrentCamera.ViewportSize.X/2, -200) -- 初始位置在屏幕上方
+        text.Color = Color3.new(1, 0.2, 0.2)
+        text.Outline = true
+        text.OutlineColor = Color3.new(1, 1, 1)
+        text.Transparency = 0
+        text.Visible = true
+        text.ZIndex = 1000
+        
+        -- 创建副标题
+        local subText = Drawing.new("Text")
+        subText.Text = "尊享特权版 - 启动成功"
+        subText.Size = 40
+        subText.Center = true
+        subText.Position = Vector2.new(workspace.CurrentCamera.ViewportSize.X/2, -100) -- 初始位置在屏幕上方
+        subText.Color = Color3.new(0.8, 0.8, 1)
+        subText.Outline = true
+        subText.OutlineColor = Color3.new(0.2, 0.2, 0.2)
+        subText.Transparency = 0
+        subText.Visible = true
+        subText.ZIndex = 1000
+        
+        -- 弹性动画函数 (模拟弹簧物理效果)
+        local function elasticAnimation(obj, targetY, duration)
+            local startY = obj.Position.Y
+            local startTime = tick()
+            local damping = 0.7 -- 阻尼系数 (0-1)
+            local stiffness = 0.3 -- 弹性系数
             
-            if progress >= 1 then
-                obj.Position = Vector2.new(obj.Position.X, targetY)
-                connection:Disconnect()
-                return
+            local connection
+            connection = game:GetService("RunService").RenderStepped:Connect(function()
+                local elapsed = tick() - startTime
+                local progress = elapsed / duration
+                
+                if progress >= 1 then
+                    obj.Position = Vector2.new(obj.Position.X, targetY)
+                    connection:Disconnect()
+                    return
+                end
+                
+                -- 弹性计算公式
+                local overshoot = math.sin(progress * math.pi * 4) * (1 - progress)
+                local newY = targetY + (startY - targetY) * math.pow(1 - progress, 2) * overshoot * stiffness
+                
+                -- 应用阻尼
+                stiffness = stiffness * damping
+                
+                obj.Position = Vector2.new(obj.Position.X, newY)
+            end)
+        end
+        
+        spawn(function()
+            -- 背景淡入
+            for i = 0, 1, 0.05 do
+                bg.Transparency = 1 - i * 0.7
+                wait(0.01)
             end
             
-            -- 弹性计算公式
-            local overshoot = math.sin(progress * math.pi * 4) * (1 - progress)
-            local newY = targetY + (startY - targetY) * math.pow(1 - progress, 2) * overshoot * stiffness
+            -- 主标题弹性下落 (目标Y位置是屏幕中心-100)
+            elasticAnimation(text, workspace.CurrentCamera.ViewportSize.Y/2 - 100, 1.5)
             
-            -- 应用阻尼
-            stiffness = stiffness * damping
+            -- 副标题延迟0.2秒后弹性下落
+            wait(0.2)
+            elasticAnimation(subText, workspace.CurrentCamera.ViewportSize.Y/2 + 20, 1.3)
             
-            obj.Position = Vector2.new(obj.Position.X, newY)
+            -- 总停留时间5秒 (从动画开始计算)
+            wait(3.5) -- 因为动画已经用了1.5秒
+            
+            -- 淡出动画
+            for i = 0, 1, 0.05 do
+                text.Transparency = i
+                subText.Transparency = i
+                bg.Transparency = 0.3 + i * 0.7
+                wait(0.01)
+            end
+            
+            -- 移除绘图对象
+            bg:Remove()
+            text:Remove()
+            subText:Remove()
         end)
     end
-    
-    spawn(function()
-        -- 背景淡入
-        for i = 0, 1, 0.05 do
-            bg.Transparency = 1 - i * 0.7
-            wait(0.01)
-        end
-        
-        -- 主标题弹性下落 (目标Y位置是屏幕中心-100)
-        elasticAnimation(text, workspace.CurrentCamera.ViewportSize.Y/2 - 100, 1.5)
-        
-        -- 副标题延迟0.2秒后弹性下落
-        wait(0.2)
-        elasticAnimation(subText, workspace.CurrentCamera.ViewportSize.Y/2 + 20, 1.3)
-        
-        -- 总停留时间5秒 (从动画开始计算)
-        wait(3.5) -- 因为动画已经用了1.5秒
-        
-        -- 淡出动画
-        for i = 0, 1, 0.05 do
-            text.Transparency = i
-            subText.Transparency = i
-            bg.Transparency = 0.3 + i * 0.7
-            wait(0.01)
-        end
-        
-        -- 移除绘图对象
-        bg:Remove()
-        text:Remove()
-        subText:Remove()
-    end)
-end
 
-    -- 显示主窗口（验证通过后）
-    local function ShowMainWindow()
-        -- 主窗口
-        local Window = OrionLib:MakeWindow({
-            IntroText = "坤坤大帝脚本",
-            Name = "坤坤大帝脚本 - " .. identifyexecutor(),
-            HidePremium = false,
-            SaveConfig = true,
-            ConfigFolder = "StitchConfig"
-        })
-        
-        -- 公告 Tab
-        local Tab1 = Window:MakeTab({Name = "公告", Icon = "rbxassetid://7733779610"})
-        local function getDate() return os.date("%Y-%m-%d %H:%M") end
-        local function getPlayer()
-            local p = game.Players.LocalPlayer
-            return {
-                ["用户名"]   = p.Name,
-                ["显示名"]   = p.DisplayName,
-                ["用户ID"]   = p.UserId,
-                ["注册天数"] = p.AccountAge,
-                ["当前游戏"] = game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId).Name
-            }
-        end
-        Tab1:AddLabel("📅 当前时间")
-        Tab1:AddLabel(getDate())
-        for k, v in pairs(getPlayer()) do
-            Tab1:AddLabel(k .. "： " .. tostring(v))
-        end
-        
-        -- 添加一键复制QQ号按钮
-        Tab1:AddButton({
-            Name = "一键复制QQ号", 
-            Callback = function() 
-                local success = CopyToClipboard("913348285")
-                ShowCopyNotification(success, "913348285")
+        -- 显示主窗口（验证通过后）
+        local function ShowMainWindow()
+            -- 主窗口
+            local Window = OrionLib:MakeWindow({
+                IntroText = "坤坤大帝脚本",
+                Name = "坤坤大帝脚本 - " .. (identifyexecutor and identifyexecutor() or "未知执行器"),
+                HidePremium = false,
+                SaveConfig = true,
+                ConfigFolder = "StitchConfig"
+            })
+            
+            -- 公告 Tab
+            local Tab1 = Window:MakeTab({Name = "公告", Icon = "rbxassetid://7733779610"})
+            local function getDate() return os.date("%Y-%m-%d %H:%M") end
+            local function getPlayer()
+                local p = game.Players.LocalPlayer
+                return {
+                    ["用户名"]   = p.Name,
+                    ["显示名"]   = p.DisplayName,
+                    ["用户ID"]   = p.UserId,
+                    ["注册天数"] = p.AccountAge,
+                    ["当前游戏"] = game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId).Name
+                }
             end
-        })
-        
-        -- 确保你前面有这行（放在 OrionLib 初始化后）
-        local Tab4 = Window:MakeTab({Name = "人物功能", Icon = "rbxassetid://7733779610"})
-        
-        -- 兼容 executor 没有 mouse1press / mouse1release
-        local mouse1press  = mouse1press  or function()
-            local vim = game:GetService("VirtualInputManager")
-            vim:SendMouseButtonEvent(0,0,0,true,game,1)
-        end
-        local mouse1release = mouse1release or function()
-            local vim = game:GetService("VirtualInputManager")
-            vim:SendMouseButtonEvent(0,0,0,false,game,1)
-        end
-        
-        -----------------------------------------------------------------
-        -- ⑤ 双独立 FOV（白跟随 + 橙固定）都参与瞄准判定 - 增强版
-        -----------------------------------------------------------------
-        -- 通用参数
-        local aimbotEnabled      = false
-        local aimbotSmooth       = 0.35
-        local aimbotBone         = "Head"
-        local aimbotPrediction   = 0.12
-        local aimbotDelay        = 0.08
-        local aimbotCheckTeam    = false  -- 默认关闭"仅瞄准敌人"
-        local lastFire = 0
-        local aimbotConn
-        local aimbotMode = "Distance"  -- 瞄准方式: "Distance" 或 "Crosshair"
-        local wallCheckEnabled = true  -- 默认开启墙体检测
-        local aimLineEnabled = false   -- 自瞄线条开关
-        local aimLine = Drawing.new("Line") -- 自瞄线条对象
-        
-        -- 初始化自瞄线条
-        aimLine.Visible = false
-        aimLine.Thickness = 1.5
-        aimLine.Color = Color3.fromRGB(0, 255, 0)
-        aimLine.ZIndex = 11
-        
-        -- 缺失变量一次性补全
-        local Camera = workspace.CurrentCamera
-        local UserInputService = game:GetService("UserInputService")
-        local Players = game:GetService("Players")
-        local LocalPlayer = Players.LocalPlayer
-        
-        -- 1. 跟随鼠标 FOV
-        local mouseFOV      = 120
-        local mouseFovCircle = Drawing.new("Circle")
-        mouseFovCircle.NumSides  = 64
-        mouseFovCircle.Radius    = mouseFOV
-        mouseFovCircle.Thickness = 1.5
-        mouseFovCircle.Color     = Color3.fromRGB(255,255,255)
-        mouseFovCircle.Filled    = false
-        mouseFovCircle.Visible   = false
-        mouseFovCircle.ZIndex = 10
-        
-        -- 2. 固定中心 FOV
-        local fixedFOV      = 90
-        local fixedFovCircle = Drawing.new("Circle")
-        fixedFovCircle.NumSides  = 64
-        fixedFovCircle.Radius    = fixedFOV
-        fixedFovCircle.Thickness = 1.5
-        fixedFovCircle.Color     = Color3.fromRGB(255,165,0)
-        fixedFovCircle.Filled    = false
-        fixedFovCircle.Visible   = false
-        fixedFovCircle.ZIndex = 9
-        
-        -- 固定圆中心一次设置
-        local function setFixedCenter()
-            local center = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
-            fixedFovCircle.Position = center
-        end
-        Camera:GetPropertyChangedSignal("ViewportSize"):Connect(setFixedCenter)
-        setFixedCenter()
-        
-        -- 工具函数
-        local function getAimPos(character)
-            if not character then return nil end
-            local root = character:FindFirstChild("HumanoidRootPart")
-            local bone = character:FindFirstChild(aimbotBone) or character:FindFirstChild("Head")
-            if not (root and bone) then return nil end
+            Tab1:AddLabel("📅 当前时间")
+            Tab1:AddLabel(getDate())
+            for k, v in pairs(getPlayer()) do
+                Tab1:AddLabel(k .. "： " .. tostring(v))
+            end
             
-            -- 修复：即使玩家不动也要瞄准
-            local vel = root.Velocity
-            return bone.Position + vel * aimbotPrediction
-        end
-        
-        local function isVisible(pos, ignore)
-            if not wallCheckEnabled then return true end
-            
-            local origin = Camera.CFrame.Position
-            local direction = (pos - origin).Unit
-            local ray = Ray.new(origin, direction * (origin - pos).Magnitude)
-            local part, position = workspace:FindPartOnRayWithIgnoreList(ray, ignore or {LocalPlayer.Character})
-            return part == nil or part:IsDescendantOf(LocalPlayer.Character)
-        end
-        
-        -- 判定是否在任一 FOV
-        local function inAnyFOV(worldPos)
-            local screenPos = Camera:WorldToViewportPoint(worldPos)
-            if screenPos.Z <= 0 then return false end
-            
-            local mousePos = UserInputService:GetMouseLocation()
-            local center = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
-            
-            -- 跟随圆
-            if mouseFovCircle.Visible then
-                if (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude <= mouseFOV then
-                    return true
+            -- 添加一键复制QQ号按钮
+            Tab1:AddButton({
+                Name = "一键复制QQ号", 
+                Callback = function() 
+                    local success = CopyToClipboard("913348285")
+                    ShowCopyNotification(success, "913348285")
                 end
+            })
+            
+            -- 确保你前面有这行（放在 OrionLib 初始化后）
+            local Tab4 = Window:MakeTab({Name = "人物功能", Icon = "rbxassetid://7733779610"})
+            
+            -- 兼容 executor 没有 mouse1press / mouse1release
+            local mouse1press  = mouse1press  or function()
+                local vim = game:GetService("VirtualInputManager")
+                vim:SendMouseButtonEvent(0,0,0,true,game,1)
+            end
+            local mouse1release = mouse1release or function()
+                local vim = game:GetService("VirtualInputManager")
+                vim:SendMouseButtonEvent(0,0,0,false,game,1)
             end
             
-            -- 固定圆
-            if fixedFovCircle.Visible then
-                if (Vector2.new(screenPos.X, screenPos.Y) - center).Magnitude <= fixedFOV then
-                    return true
+            -----------------------------------------------------------------
+            -- ⑤ 双独立 FOV（白跟随 + 橙固定）都参与瞄准判定 - 增强版
+            -----------------------------------------------------------------
+            -- 通用参数
+            local aimbotEnabled      = false
+            local aimbotSmooth       = 0.35
+            local aimbotBone         = "Head"
+            local aimbotPrediction   = 0.12
+            local aimbotDelay        = 0.08
+            local aimbotCheckTeam    = false  -- 默认关闭"仅瞄准敌人"
+            local lastFire = 0
+            local aimbotConn
+            local aimbotMode = "Distance"  -- 瞄准方式: "Distance" 或 "Crosshair"
+            local wallCheckEnabled = true  -- 默认开启墙体检测
+            local aimLineEnabled = false   -- 自瞄线条开关
+            local aimLine = Drawing.new("Line") -- 自瞄线条对象
+            
+            -- 初始化自瞄线条
+            aimLine.Visible = false
+            aimLine.Thickness = 1.5
+            aimLine.Color = Color3.fromRGB(0, 255, 0)
+            aimLine.ZIndex = 11
+            
+            -- 缺失变量一次性补全
+            local Camera = workspace.CurrentCamera
+            local UserInputService = game:GetService("UserInputService")
+            local Players = game:GetService("Players")
+            local LocalPlayer = Players.LocalPlayer
+            
+            -- 1. 跟随鼠标 FOV
+            local mouseFOV      = 120
+            local mouseFovCircle = Drawing.new("Circle")
+            mouseFovCircle.NumSides  = 64
+            mouseFovCircle.Radius    = mouseFOV
+            mouseFovCircle.Thickness = 1.5
+            mouseFovCircle.Color     = Color3.fromRGB(255,255,255)
+            mouseFovCircle.Filled    = false
+            mouseFovCircle.Visible   = false
+            mouseFovCircle.ZIndex = 10
+            
+            -- 2. 固定中心 FOV
+            local fixedFOV      = 90
+            local fixedFovCircle = Drawing.new("Circle")
+            fixedFovCircle.NumSides  = 64
+            fixedFovCircle.Radius    = fixedFOV
+            fixedFovCircle.Thickness = 1.5
+            fixedFovCircle.Color     = Color3.fromRGB(255,165,0)
+            fixedFovCircle.Filled    = false
+            fixedFovCircle.Visible   = false
+            fixedFovCircle.ZIndex = 9
+            
+            -- 固定圆中心一次设置
+            local function setFixedCenter()
+                local center = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
+                fixedFovCircle.Position = center
+            end
+            Camera:GetPropertyChangedSignal("ViewportSize"):Connect(setFixedCenter)
+            setFixedCenter()
+            
+            -- 工具函数
+            local function getAimPos(character)
+                if not character then return nil end
+                local root = character:FindFirstChild("HumanoidRootPart")
+                local bone = character:FindFirstChild(aimbotBone) or character:FindFirstChild("Head")
+                if not (root and bone) then return nil end
+                
+                -- 修复：即使玩家不动也要瞄准
+                local vel = root.Velocity
+                return bone.Position + vel * aimbotPrediction
+            end
+            
+            local function isVisible(pos, ignore)
+                if not wallCheckEnabled then return true end
+                
+                local origin = Camera.CFrame.Position
+                local direction = (pos - origin).Unit
+                local ray = Ray.new(origin, direction * (origin - pos).Magnitude)
+                local part, position = workspace:FindPartOnRayWithIgnoreList(ray, ignore or {LocalPlayer.Character})
+                return part == nil or part:IsDescendantOf(LocalPlayer.Character)
+            end
+            
+            -- 判定是否在任一 FOV
+            local function inAnyFOV(worldPos)
+                local screenPos = Camera:WorldToViewportPoint(worldPos)
+                if screenPos.Z <= 0 then return false end
+                
+                local mousePos = UserInputService:GetMouseLocation()
+                local center = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
+                
+                -- 跟随圆
+                if mouseFovCircle.Visible then
+                    if (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude <= mouseFOV then
+                        return true
+                    end
                 end
+                
+                -- 固定圆
+                if fixedFovCircle.Visible then
+                    if (Vector2.new(screenPos.X, screenPos.Y) - center).Magnitude <= fixedFOV then
+                        return true
+                    end
+                end
+                
+                return false
             end
             
-            return false
-        end
-        
-        -- 取最近目标（根据选择的瞄准方式）
-        local function getClosest()
-            local closest, minDist = nil, math.huge
-            local center = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
+            -- 取最近目标（根据选择的瞄准方式）
+            local function getClosest()
+                local closest, minDist = nil, math.huge
+                local center = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
+                
+                for _, plr in ipairs(Players:GetPlayers()) do
+                    if plr == LocalPlayer then continue end
+                    if aimbotCheckTeam and plr.Team and plr.Team == LocalPlayer.Team then continue end
+                    
+                    local char = plr.Character
+                    if not char then continue end
+                    
+                    local aimPos = getAimPos(char)
+                    if not aimPos then continue end
+                    if not inAnyFOV(aimPos) then continue end
+                    
+                    local ignoreList = {LocalPlayer.Character, Camera}
+                    if not isVisible(aimPos, ignoreList) then continue end
+                    
+                    local sp = Camera:WorldToViewportPoint(aimPos)
+                    if sp.Z <= 0 then continue end
+                    
+                    local dist
+                    if aimbotMode == "Distance" then
+                        -- 3D距离
+                        dist = (aimPos - Camera.CFrame.Position).Magnitude
+                    else
+                        -- 2D屏幕距离
+                        dist = (Vector2.new(sp.X, sp.Y) - center).Magnitude
+                    end
+                    
+                    if dist < minDist then
+                        minDist, closest = dist, plr
+                    end
+                end
+                return closest
+            end
             
-            for _, plr in ipairs(Players:GetPlayers()) do
-                if plr == LocalPlayer then continue end
-                if aimbotCheckTeam and plr.Team and plr.Team == LocalPlayer.Team then continue end
-                
-                local char = plr.Character
-                if not char then continue end
-                
-                local aimPos = getAimPos(char)
-                if not aimPos then continue end
-                if not inAnyFOV(aimPos) then continue end
-                
-                local ignoreList = {LocalPlayer.Character, Camera}
-                if not isVisible(aimPos, ignoreList) then continue end
-                
-                local sp = Camera:WorldToViewportPoint(aimPos)
-                if sp.Z <= 0 then continue end
-                
-                local dist
-                if aimbotMode == "Distance" then
-                    -- 3D距离
-                    dist = (aimPos - Camera.CFrame.Position).Magnitude
+    -- 主循环（带防瞬甩）
+    local function startAimbot()
+        if aimbotConn then return end
+        
+        aimbotConn = game:GetService("RunService").RenderStepped:Connect(function()
+            if not aimbotEnabled then 
+                aimLine.Visible = false
+                return 
+            end
+            
+            -- 更新跟随圆
+            mouseFovCircle.Position = UserInputService:GetMouseLocation()
+
+            local target = getClosest()
+            if not target or not target.Character then 
+                aimLine.Visible = false
+                return 
+            end
+            
+            local aimPos = getAimPos(target.Character)
+            if not aimPos then 
+                aimLine.Visible = false
+                return 
+            end
+
+            -- 更新自瞄线条
+            if aimLineEnabled then
+                local screenPos = Camera:WorldToViewportPoint(aimPos)
+                if screenPos.Z > 0 then
+                    aimLine.From = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
+                    aimLine.To = Vector2.new(screenPos.X, screenPos.Y)
+                    aimLine.Visible = true
                 else
-                    -- 2D屏幕距离
-                    dist = (Vector2.new(sp.X, sp.Y) - center).Magnitude
+                    aimLine.Visible = false
                 end
-                
-                if dist < minDist then
-                    minDist, closest = dist, plr
-                end
-            end
-            return closest
-        end
-        
--- 主循环（带防瞬甩）
-local function startAimbot()
-    if aimbotConn then return end
-    
-    aimbotConn = game:GetService("RunService").RenderStepped:Connect(function()
-        if not aimbotEnabled then 
-            aimLine.Visible = false
-            return 
-        end
-        
-        -- 更新跟随圆
-        mouseFovCircle.Position = UserInputService:GetMouseLocation()
-
-        local target = getClosest()
-        if not target or not target.Character then 
-            aimLine.Visible = false
-            return 
-        end
-        
-        local aimPos = getAimPos(target.Character)
-        if not aimPos then 
-            aimLine.Visible = false
-            return 
-        end
-
-        -- 更新自瞄线条
-        if aimLineEnabled then
-            local screenPos = Camera:WorldToViewportPoint(aimPos)
-            if screenPos.Z > 0 then
-                aimLine.From = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
-                aimLine.To = Vector2.new(screenPos.X, screenPos.Y)
-                aimLine.Visible = true
             else
                 aimLine.Visible = false
             end
-        else
-            aimLine.Visible = false
-        end
-        
-        -- 安全 + 角度限制
-        local delta = aimPos - Camera.CFrame.Position
-        if delta.Magnitude < 0.01 then return end  -- 将0.1改为0.01
-        
-        local targetCF = CFrame.new(Camera.CFrame.Position, Camera.CFrame.Position + delta)
-        local currentLook = Camera.CFrame.LookVector
-        local targetLook = targetCF.LookVector
-        
-        local dot = currentLook:Dot(targetLook)
-        local angle = math.acos(math.clamp(dot, -1, 1))
-        local maxAngle = math.rad(90)
-        
-        if angle <= maxAngle then
-            local smoothFactor = math.clamp(aimbotSmooth, 0.01, 0.99)
-            local newLook = currentLook:Lerp(targetLook, 1 - smoothFactor)
-            Camera.CFrame = CFrame.new(Camera.CFrame.Position, Camera.CFrame.Position + newLook)
-        end
+            
+            -- 安全 + 角度限制
+            local delta = aimPos - Camera.CFrame.Position
+            if delta.Magnitude < 0.01 then return end  -- 将0.1改为0.01
+            
+            local targetCF = CFrame.new(Camera.CFrame.Position, Camera.CFrame.Position + delta)
+            local currentLook = Camera.CFrame.LookVector
+            local targetLook = targetCF.LookVector
+            
+            local dot = currentLook:Dot(targetLook)
+            local angle = math.acos(math.clamp(dot, -1, 1))
+            local maxAngle = math.rad(90)
+            
+            if angle <= maxAngle then
+                local smoothFactor = math.clamp(aimbotSmooth, 0.01, 0.99)
+                local newLook = currentLook:Lerp(targetLook, 1 - smoothFactor)
+                Camera.CFrame = CFrame.new(Camera.CFrame.Position, Camera.CFrame.Position + newLook)
+            end
 
-        if tick() - lastFire > aimbotDelay then
-            mouse1press()
-            task.wait(0.05)
-            mouse1release()
-            lastFire = tick()
-        end
-    end)
-end
-        
-        local function stopAimbot()
-            if aimbotConn then 
-                aimbotConn:Disconnect() 
-                aimbotConn = nil 
+            if tick() - lastFire > aimbotDelay then
+                mouse1press()
+                task.wait(0.05)
+                mouse1release()
+                lastFire = tick()
             end
-            mouseFovCircle.Visible = false
-            fixedFovCircle.Visible = false
-            aimLine.Visible = false
-        end
-        
-        -----------------------------------------------------------------
-        -- UI 构建（增强版）
-        -----------------------------------------------------------------
-        local aimbotSec = Tab4:AddSection({Name = "AI-Aimbot"})
-        aimbotSec:AddToggle({
-            Name = "启用 Aimbot",
-            Default = false,
-            Callback = function(v)
-                aimbotEnabled = v
-                if v then 
-                    startAimbot() 
-                else 
-                    stopAimbot() 
+        end)
+    end
+            
+            local function stopAimbot()
+                if aimbotConn then 
+                    aimbotConn:Disconnect() 
+                    aimbotConn = nil 
                 end
+                mouseFovCircle.Visible = false
+                fixedFovCircle.Visible = false
+                aimLine.Visible = false
             end
-        })
-        aimbotSec:AddToggle({
-            Name = "仅瞄准敌人",
-            Default = aimbotCheckTeam,
-            Callback = function(v) aimbotCheckTeam = v end
-        })
-        aimbotSec:AddToggle({
-            Name = "墙体检测",
-            Default = wallCheckEnabled,
-            Callback = function(v) wallCheckEnabled = v end
-        })
-        aimbotSec:AddToggle({
-            Name = "显示自瞄线条",
-            Default = aimLineEnabled,
-            Callback = function(v) aimLineEnabled = v end
-        })
-        aimbotSec:AddDropdown({
-            Name = "瞄准方式",
-            Default = aimbotMode,
-            Options = {"Distance", "Crosshair"},
-            Callback = function(v) aimbotMode = v end
-        })
-        
-        local mouseSec = Tab4:AddSection({Name = "跟随鼠标 FOV"})
-        local mouseTog = mouseSec:AddToggle({ Name = "显示跟随FOV", Default = false, Callback = function(v) mouseFovCircle.Visible = v end })
-        local mouseSlider = mouseSec:AddSlider({ Name = "半径（滑条）", Min = 0, Max = 500, Default = mouseFOV, Increment = 5, Callback = function(v) mouseFOV = v; mouseFovCircle.Radius = v end })
-        mouseSec:AddTextbox({ Name = "半径（输入）", Default = tostring(mouseFOV), Callback = function(txt) local n = tonumber(txt) if n then mouseFOV = n; mouseFovCircle.Radius = n; mouseSlider:Set(n) end end })
-        
-        local fixedSec = Tab4:AddSection({Name = "固定中心 FOV"})
-        local fixedTog = fixedSec:AddToggle({ Name = "显示固定FOV", Default = false, Callback = function(v) fixedFovCircle.Visible = v end })
-        local fixedSlider = fixedSec:AddSlider({ Name = "半径（滑条）", Min = 0, Max = 500, Default = fixedFOV, Increment = 5, Callback = function(v) fixedFOV = v; fixedFovCircle.Radius = v end })
-        fixedSec:AddTextbox({ Name = "半径（输入）", Default = tostring(fixedFOV), Callback = function(txt) local n = tonumber(txt) if n then fixedFOV = n; fixedFovCircle.Radius = n; fixedSlider:Set(n) end end })
-        
-        local commonSec = Tab4:AddSection({Name = "通用参数"})
-        local smoothSlider = commonSec:AddSlider({ Name = "平滑系数（滑条）", Min = 0, Max = 1, Default = aimbotSmooth, Increment = 0.01, Callback = function(v) aimbotSmooth = v end })
-        commonSec:AddTextbox({ Name = "平滑系数（输入）", Default = tostring(aimbotSmooth), Callback = function(txt) local n = tonumber(txt) if n then aimbotSmooth = n; smoothSlider:Set(n) end end })
-        local predSlider = commonSec:AddSlider({ Name = "预测 (秒)（滑条）", Min = 0, Max = 1, Default = aimbotPrediction, Increment = 0.01, Callback = function(v) aimbotPrediction = v end })
-        commonSec:AddTextbox({ Name = "预测 (秒)（输入）", Default = tostring(aimbotPrediction), Callback = function(txt) local n = tonumber(txt) if n then aimbotPrediction = n; predSlider:Set(n) end end })
-        local delaySlider = commonSec:AddSlider({ Name = "开火延迟 (秒)（滑条）", Min = 0, Max = 1, Default = aimbotDelay, Increment = 0.01, Callback = function(v) aimbotDelay = v end })
-        commonSec:AddTextbox({ Name = "开火延迟 (秒)（输入）", Default = tostring(aimbotDelay), Callback = function(txt) local n = tonumber(txt) if n then aimbotDelay = n; delaySlider:Set(n) end end })
-        commonSec:AddDropdown({ Name = "瞄准骨骼", Default = aimbotBone, Options = {"Head","Neck","UpperTorso","HumanoidRootPart"}, Callback = function(v) aimbotBone = v end })
-        
-        
-        -----------------------------------------------------------------
-        -- ⑥ 删除阴影（全局开关）
-        -----------------------------------------------------------------
-        Tab4:AddToggle({
-            Name = "删除阴影",
-            Default = false,
-            Callback = function(v)
-                game.Lighting.GlobalShadows = not v
-                for _, l in ipairs(workspace:GetDescendants()) do
-                    if l:IsA("BasePart") or l:IsA("MeshPart") then
-                        l.CastShadow = not v
+            
+            -----------------------------------------------------------------
+            -- UI 构建（增强版）
+            -----------------------------------------------------------------
+            local aimbotSec = Tab4:AddSection({Name = "AI-Aimbot"})
+            aimbotSec:AddToggle({
+                Name = "启用 Aimbot",
+                Default = false,
+                Callback = function(v)
+                    aimbotEnabled = v
+                    if v then 
+                        startAimbot() 
+                    else 
+                        stopAimbot() 
                     end
                 end
-                OrionLib:MakeNotification({Name = "提示", Content = v and "阴影已删除" or "阴影已恢复", Time = 2})
-            end
-        })
+            })
+            aimbotSec:AddToggle({
+                Name = "仅瞄准敌人",
+                Default = aimbotCheckTeam,
+                Callback = function(v) aimbotCheckTeam = v end
+            })
+            aimbotSec:AddToggle({
+                Name = "墙体检测",
+                Default = wallCheckEnabled,
+                Callback = function(v) wallCheckEnabled = v end
+            })
+            aimbotSec:AddToggle({
+                Name = "显示自瞄线条",
+                Default = aimLineEnabled,
+                Callback = function(v) aimLineEnabled = v end
+            })
+            aimbotSec:AddDropdown({
+                Name = "瞄准方式",
+                Default = aimbotMode,
+                Options = {"Distance", "Crosshair"},
+                Callback = function(v) aimbotMode = v end
+            })
+            
+            local mouseSec = Tab4:AddSection({Name = "跟随鼠标 FOV"})
+            local mouseTog = mouseSec:AddToggle({ Name = "显示跟随FOV", Default = false, Callback = function(v) mouseFovCircle.Visible = v end })
+            local mouseSlider = mouseSec:AddSlider({ Name = "半径（滑条）", Min = 0, Max = 500, Default = mouseFOV, Increment = 5, Callback = function(v) mouseFOV = v; mouseFovCircle.Radius = v end })
+            mouseSec:AddTextbox({ Name = "半径（输入）", Default = tostring(mouseFOV), Callback = function(txt) local n = tonumber(txt) if n then mouseFOV = n; mouseFovCircle.Radius = n; mouseSlider:Set(n) end end })
+            
+            local fixedSec = Tab4:AddSection({Name = "固定中心 FOV"})
+            local fixedTog = fixedSec:AddToggle({ Name = "显示固定FOV", Default = false, Callback = function(v) fixedFovCircle.Visible = v end })
+            local fixedSlider = fixedSec:AddSlider({ Name = "半径（滑条）", Min = 0, Max = 500, Default = fixedFOV, Increment = 5, Callback = function(v) fixedFOV = v; fixedFovCircle.Radius = v end })
+            fixedSec:AddTextbox({ Name = "半径（输入）", Default = tostring(fixedFOV), Callback = function(txt) local n = tonumber(txt) if n then fixedFOV = n; fixedFovCircle.Radius = n; fixedSlider:Set(n) end end })
+            
+            local commonSec = Tab4:AddSection({Name = "通用参数"})
+            local smoothSlider = commonSec:AddSlider({ Name = "平滑系数（滑条）", Min = 0, Max = 1, Default = aimbotSmooth, Increment = 0.01, Callback = function(v) aimbotSmooth = v end })
+            commonSec:AddTextbox({ Name = "平滑系数（输入）", Default = tostring(aimbotSmooth), Callback = function(txt) local n = tonumber(txt) if n then aimbotSmooth = n; smoothSlider:Set(n) end end })
+            local predSlider = commonSec:AddSlider({ Name = "预测 (秒)（滑条）", Min = 0, Max = 1, Default = aimbotPrediction, Increment = 0.01, Callback = function(v) aimbotPrediction = v end })
+            commonSec:AddTextbox({ Name = "预测 (秒)（输入）", Default = tostring(aimbotPrediction), Callback = function(txt) local n = tonumber(txt) if n then aimbotPrediction = n; predSlider:Set(n) end end })
+            local delaySlider = commonSec:AddSlider({ Name = "开火延迟 (秒)（滑条）", Min = 0, Max = 1, Default = aimbotDelay, Increment = 0.01, Callback = function(v) aimbotDelay = v end })
+            commonSec:AddTextbox({ Name = "开火延迟 (秒)（输入）", Default = tostring(aimbotDelay), Callback = function(txt) local n = tonumber(txt) if n then aimbotDelay = n; delaySlider:Set(n) end end })
+            commonSec:AddDropdown({ Name = "瞄准骨骼", Default = aimbotBone, Options = {"Head","Neck","UpperTorso","HumanoidRootPart"}, Callback = function(v) aimbotBone = v end })
+            
+            
+            -----------------------------------------------------------------
+            -- ⑥ 删除阴影（全局开关）
+            -----------------------------------------------------------------
+            Tab4:AddToggle({
+                Name = "删除阴影",
+                Default = false,
+                Callback = function(v)
+                    game.Lighting.GlobalShadows = not v
+                    for _, l in ipairs(workspace:GetDescendants()) do
+                        if l:IsA("BasePart") or l:IsA("MeshPart") then
+                            l.CastShadow = not v
+                        end
+                    end
+                    OrionLib:MakeNotification({Name = "提示", Content = v and "阴影已删除" or "阴影已恢复", Time = 2})
+                end
+            })
 
------------------------------------------------------------------
-        -- 优化后的飞行功能 (修复bug并提高流畅度)
-        -----------------------------------------------------------------
-        local flying = false
-        local flySpeed = 50
-        local bg, bv
-        local ctrl = {f = 0, b = 0, l = 0, r = 0, u = 0, d = 0} -- 添加垂直方向控制
-        local lastctrl = {f = 0, b = 0, l = 0, r = 0}
-        local flyConnection
-        
-        -- 更流畅的飞行循环
-        local function flyLoop()
-            while flying and game:GetService("RunService").Heartbeat:Wait() do
-                local character = game.Players.LocalPlayer.Character
-                if not character then break end
+    -----------------------------------------------------------------
+            -- 优化后的飞行功能 (修复bug并提高流畅度)
+            -----------------------------------------------------------------
+            local flying = false
+            local flySpeed = 50
+            local bg, bv
+            local ctrl = {f = 0, b = 0, l = 0, r = 0, u = 0, d = 0} -- 添加垂直方向控制
+            local lastctrl = {f = 0, b = 0, l = 0, r = 0}
+            local flyConnection
+            
+            -- 更流畅的飞行循环
+            local function flyLoop()
+                while flying and game:GetService("RunService").Heartbeat:Wait() do
+                    local character = game.Players.LocalPlayer.Character
+                    if not character then break end
+                    
+                    local torso = character:FindFirstChild("HumanoidRootPart") or 
+                                  character:FindFirstChild("Torso") or 
+                                  character:FindFirstChild("UpperTorso")
+                    if not torso then break end
+                    
+                    -- 计算移动方向
+                    local moveDirection = Vector3.new(ctrl.r - ctrl.l, ctrl.u - ctrl.d, ctrl.b - ctrl.f)
+                    if moveDirection.Magnitude > 0 then
+                        moveDirection = moveDirection.Unit
+                    end
+                    
+                    -- 应用飞行速度
+                    local camera = workspace.CurrentCamera
+                    local cameraCFrame = camera.CFrame
+                    local cameraLookVector = cameraCFrame.LookVector
+                    local cameraRightVector = cameraCFrame.RightVector
+                    local cameraUpVector = cameraCFrame.UpVector
+                    
+                    local velocity = (cameraLookVector * moveDirection.Z * flySpeed) +
+                                    (cameraRightVector * moveDirection.X * flySpeed) +
+                                    (cameraUpVector * moveDirection.Y * flySpeed)
+                    
+                    bv.Velocity = velocity
+                    
+                    -- 平滑旋转
+                    if moveDirection.Magnitude > 0 then
+                        bg.CFrame = cameraCFrame * CFrame.Angles(
+                            -math.rad(moveDirection.Z * 15),
+                            math.rad(moveDirection.X * 15),
+                            0
+                        )
+                    end
+                end
+            end
+            
+            local function startFlying()
+                if flying then return end
                 
+                local character = game.Players.LocalPlayer.Character
+                if not character then 
+                    OrionLib:MakeNotification({
+                        Name = "飞行错误",
+                        Content = "找不到角色",
+                        Time = 3
+                    })
+                    return 
+                end
+                
+                local humanoid = character:FindFirstChildOfClass("Humanoid")
+                if not humanoid then 
+                    OrionLib:MakeNotification({
+                        Name = "飞行错误",
+                        Content = "找不到Humanoid",
+                        Time = 3
+                    })
+                    return 
+                end
+                
+                flying = true
+                
+                -- 创建飞行控制组件
                 local torso = character:FindFirstChild("HumanoidRootPart") or 
                               character:FindFirstChild("Torso") or 
                               character:FindFirstChild("UpperTorso")
-                if not torso then break end
-                
-                -- 计算移动方向
-                local moveDirection = Vector3.new(ctrl.r - ctrl.l, ctrl.u - ctrl.d, ctrl.b - ctrl.f)
-                if moveDirection.Magnitude > 0 then
-                    moveDirection = moveDirection.Unit
-                end
-                
-                -- 应用飞行速度
-                local camera = workspace.CurrentCamera
-                local cameraCFrame = camera.CFrame
-                local cameraLookVector = cameraCFrame.LookVector
-                local cameraRightVector = cameraCFrame.RightVector
-                local cameraUpVector = cameraCFrame.UpVector
-                
-                local velocity = (cameraLookVector * moveDirection.Z * flySpeed) +
-                                (cameraRightVector * moveDirection.X * flySpeed) +
-                                (cameraUpVector * moveDirection.Y * flySpeed)
-                
-                bv.Velocity = velocity
-                
-                -- 平滑旋转
-                if moveDirection.Magnitude > 0 then
-                    bg.CFrame = cameraCFrame * CFrame.Angles(
-                        -math.rad(moveDirection.Z * 15),
-                        math.rad(moveDirection.X * 15),
-                        0
-                    )
-                end
-            end
-        end
-        
-        local function startFlying()
-            if flying then return end
-            
-            local character = game.Players.LocalPlayer.Character
-            if not character then 
-                OrionLib:MakeNotification({
-                    Name = "飞行错误",
-                    Content = "找不到角色",
-                    Time = 3
-                })
-                return 
-            end
-            
-            local humanoid = character:FindFirstChildOfClass("Humanoid")
-            if not humanoid then 
-                OrionLib:MakeNotification({
-                    Name = "飞行错误",
-                    Content = "找不到Humanoid",
-                    Time = 3
-                })
-                return 
-            end
-            
-            flying = true
-            
-            -- 创建飞行控制组件
-            local torso = character:FindFirstChild("HumanoidRootPart") or 
-                          character:FindFirstChild("Torso") or 
-                          character:FindFirstChild("UpperTorso")
-            if not torso then 
-                flying = false
-                OrionLib:MakeNotification({
-                    Name = "飞行错误",
-                    Content = "找不到身体部位",
-                    Time = 3
-                })
-                return 
-            end
-            
-            bg = Instance.new("BodyGyro", torso)
-            bg.P = 9e4
-            bg.maxTorque = Vector3.new(9e9, 9e9, 9e9)
-            bg.cframe = torso.CFrame
-            
-            bv = Instance.new("BodyVelocity", torso)
-            bv.Velocity = Vector3.new(0, 0.1, 0)
-            bv.MaxForce = Vector3.new(9e9, 9e9, 9e9)
-            
-            humanoid.PlatformStand = true
-            
-            -- 设置飞行状态
-            OrionLib:MakeNotification({
-                Name = "飞行模式",
-                Content = "飞行已启用 (速度: " .. flySpeed .. ")",
-                Time = 3
-            })
-            
-            -- 启动飞行循环
-            flyConnection = game:GetService("RunService").Heartbeat:Connect(flyLoop)
-        end
-        
-        local function stopFlying()
-            if not flying then return end
-            flying = false
-            
-            -- 清理飞行组件
-            if bg then bg:Destroy() end
-            if bv then bv:Destroy() end
-            if flyConnection then flyConnection:Disconnect() end
-            
-            -- 恢复角色状态
-            local character = game.Players.LocalPlayer.Character
-            if character then
-                local humanoid = character:FindFirstChildOfClass("Humanoid")
-                if humanoid then
-                    humanoid.PlatformStand = false
-                end
-                
-                local animate = character:FindFirstChild("Animate")
-                if animate then
-                    animate.Disabled = false
-                end
-            end
-            
-            -- 重置控制变量
-            ctrl = {f = 0, b = 0, l = 0, r = 0, u = 0, d = 0}
-            
-            OrionLib:MakeNotification({
-                Name = "飞行模式",
-                Content = "飞行已禁用",
-                Time = 3
-            })
-        end
-        
-        -- 键盘输入处理 (优化版本)
-        local inputBeganConn, inputEndedConn
-        
-        local function setupInput()
-            -- 清除旧连接
-            if inputBeganConn then inputBeganConn:Disconnect() end
-            if inputEndedConn then inputEndedConn:Disconnect() end
-            
-            -- 键盘按下事件
-            inputBeganConn = game:GetService("UserInputService").InputBegan:Connect(function(input)
-                if not flying then return end
-                
-                if input.KeyCode == Enum.KeyCode.W then
-                    ctrl.f = 1
-                elseif input.KeyCode == Enum.KeyCode.S then
-                    ctrl.b = 1
-                elseif input.KeyCode == Enum.KeyCode.A then
-                    ctrl.l = 1
-                elseif input.KeyCode == Enum.KeyCode.D then
-                    ctrl.r = 1
-                elseif input.KeyCode == Enum.KeyCode.Space then
-                    ctrl.u = 1
-                elseif input.KeyCode == Enum.KeyCode.LeftControl or input.KeyCode == Enum.KeyCode.ButtonL3 then
-                    ctrl.d = 1
-                end
-            end)
-            
-            -- 键盘释放事件
-            inputEndedConn = game:GetService("UserInputService").InputEnded:Connect(function(input)
-                if not flying then return end
-                
-                if input.KeyCode == Enum.KeyCode.W then
-                    ctrl.f = 0
-                elseif input.KeyCode == Enum.KeyCode.S then
-                    ctrl.b = 0
-                elseif input.KeyCode == Enum.KeyCode.A then
-                    ctrl.l = 0
-                elseif input.KeyCode == Enum.KeyCode.D then
-                    ctrl.r = 0
-                elseif input.KeyCode == Enum.KeyCode.Space then
-                    ctrl.u = 0
-                elseif input.KeyCode == Enum.KeyCode.LeftControl or input.KeyCode == Enum.KeyCode.ButtonL3 then
-                    ctrl.d = 0
-                end
-            end)
-        end
-        
-        -- 角色死亡时自动停止飞行
-        game.Players.LocalPlayer.CharacterAdded:Connect(function()
-            stopFlying()
-        end)
-        
-        -- 创建飞行控制UI
-        local flySection = Tab4:AddSection({Name = "飞行功能"})
-        
-        flySection:AddToggle({
-            Name = "启用飞行",
-            Default = false,
-            Callback = function(v)
-                if v then
-                    startFlying()
-                    setupInput()
-                else
-                    stopFlying()
-                end
-            end
-        })
-        
-        flySection:AddSlider({
-            Name = "飞行速度",
-            Min = 10,
-            Max = 200,
-            Default = flySpeed,
-            Increment = 5,
-            Callback = function(value)
-                flySpeed = value
-                if flying then
+                if not torso then 
+                    flying = false
                     OrionLib:MakeNotification({
-                        Name = "飞行模式",
-                        Content = "飞行速度更新为: " .. flySpeed,
-                        Time = 2
+                        Name = "飞行错误",
+                        Content = "找不到身体部位",
+                        Time = 3
                     })
-                end
-            end
-        })
-        
-        flySection:AddLabel("控制方式:")
-        flySection:AddLabel("W/A/S/D - 前后左右移动")
-        flySection:AddLabel("空格键 - 向上飞行")
-        flySection:AddLabel("Ctrl键 - 向下飞行")        
-        
-        -----------------------------------------------------------------
-        -- ⑧ 增强版玩家 ESP（含队伍检测、距离、血条和线条绘制）
-        -----------------------------------------------------------------
-        local espEnabled = false
-        local espCache = {}
-        local tracerPosition = "Bottom"  -- 线条位置: "Top" 或 "Bottom"
-        
-        -- 获取队伍颜色
-        local function getTeamColor(plr)
-            if plr.Team and LocalPlayer.Team and plr.Team == LocalPlayer.Team then
-                return Color3.fromRGB(0, 255, 0) -- 队友绿色
-            else
-                return Color3.fromRGB(255, 0, 0) -- 敌人红色
-            end
-        end
-        
-        -- 创建ESP对象
-        local function createESPObject(plr)
-            local esp = {
-                Box = Drawing.new("Quad"),
-                Name = Drawing.new("Text"),
-                Distance = Drawing.new("Text"),
-                HealthBar = Drawing.new("Quad"),
-                HealthText = Drawing.new("Text"),
-                Tracer = Drawing.new("Line")  -- 新增线条
-            }
-            
-            -- 设置初始属性
-            esp.Box.Thickness = 1.5
-            esp.Box.Filled = false
-            esp.Box.ZIndex = 5
-            
-            esp.Name.Size = 18
-            esp.Name.Center = true
-            esp.Name.Outline = true
-            esp.Name.ZIndex = 6
-            
-            esp.Distance.Size = 16
-            esp.Distance.Center = true
-            esp.Distance.Outline = true
-            esp.Distance.ZIndex = 6
-            
-            esp.HealthBar.Filled = true
-            esp.HealthBar.Thickness = 1
-            esp.HealthBar.ZIndex = 5
-            
-            esp.HealthText.Size = 14
-            esp.HealthText.Center = true
-            esp.HealthText.Outline = true
-            esp.HealthText.ZIndex = 6
-            
-            esp.Tracer.Thickness = 1.5  -- 线条粗细
-            esp.Tracer.ZIndex = 4
-            
-            espCache[plr] = esp
-            return esp
-        end
-        
-        -- 更新ESP
-        local function updateESP()
-            if not espEnabled then return end
-            
-            for _, plr in ipairs(Players:GetPlayers()) do
-                if plr == LocalPlayer then continue end
-                
-                local char = plr.Character
-                if not char then
-                    if espCache[plr] then
-                        for _, obj in pairs(espCache[plr]) do
-                            obj.Visible = false
-                        end
-                    end
-                    continue end
-                
-                local root = char:FindFirstChild("HumanoidRootPart")
-                local head = char:FindFirstChild("Head")
-                local humanoid = char:FindFirstChildOfClass("Humanoid")
-                
-                if not (root and head and humanoid) then continue end
-                
-                -- 获取屏幕位置
-                local rootPos, rootVis = Camera:WorldToViewportPoint(root.Position)
-                local headPos, headVis = Camera:WorldToViewportPoint(head.Position + Vector3.new(0, 1.5, 0))
-                
-                if not (rootVis and headVis) then
-                    if espCache[plr] then
-                        for _, obj in pairs(espCache[plr]) do
-                            obj.Visible = false
-                        end
-                    end
-                    continue
+                    return 
                 end
                 
-                -- 创建或获取ESP对象
-                local esp = espCache[plr] or createESPObject(plr)
+                bg = Instance.new("BodyGyro", torso)
+                bg.P = 9e4
+                bg.maxTorque = Vector3.new(9e9, 9e9, 9e9)
+                bg.cframe = torso.CFrame
                 
-                -- 计算尺寸
-                local height = math.abs(headPos.Y - rootPos.Y) * 1.5
-                local width = height * 0.6
-                local left = headPos.X - width / 2
-                local right = headPos.X + width / 2
+                bv = Instance.new("BodyVelocity", torso)
+                bv.Velocity = Vector3.new(0, 0.1, 0)
+                bv.MaxForce = Vector3.new(9e9, 9e9, 9e9)
                 
-                -- 设置颜色
-                local color = getTeamColor(plr)
+                humanoid.PlatformStand = true
                 
-                -- 更新方框
-                esp.Box.Visible = true
-                esp.Box.Color = color
-                esp.Box.PointA = Vector2.new(left, headPos.Y)
-                esp.Box.PointB = Vector2.new(right, headPos.Y)
-                esp.Box.PointC = Vector2.new(right, headPos.Y + height)
-                esp.Box.PointD = Vector2.new(left, headPos.Y + height)
+                -- 设置飞行状态
+                OrionLib:MakeNotification({
+                    Name = "飞行模式",
+                    Content = "飞行已启用 (速度: " .. flySpeed .. ")",
+                    Time = 3
+                })
                 
-                -- 更新名字
-                esp.Name.Visible = true
-                esp.Name.Color = color
-                esp.Name.Position = Vector2.new(headPos.X, headPos.Y - 20)
-                esp.Name.Text = plr.Name
-                
-                -- 更新距离
-                local distance = math.floor((root.Position - Camera.CFrame.Position).Magnitude)
-                esp.Distance.Visible = true
-                esp.Distance.Color = color
-                esp.Distance.Position = Vector2.new(headPos.X, headPos.Y + height + 5)
-                esp.Distance.Text = tostring(distance) .. "m"
-                
-                -- 更新血条
-                local healthPercent = math.clamp(humanoid.Health / humanoid.MaxHealth, 0, 1)
-                local barWidth = width
-                local barHeight = 5
-                local barX = left
-                local barY = headPos.Y + height + 20
-                
-                esp.HealthBar.Visible = true
-                esp.HealthBar.Color = Color3.new(1 - healthPercent, healthPercent, 0)
-                esp.HealthBar.PointA = Vector2.new(barX, barY)
-                esp.HealthBar.PointB = Vector2.new(barX + barWidth * healthPercent, barY)
-                esp.HealthBar.PointC = Vector2.new(barX + barWidth * healthPercent, barY + barHeight)
-                esp.HealthBar.PointD = Vector2.new(barX, barY + barHeight)
-                
-                -- 更新血量文本
-                esp.HealthText.Visible = true
-                esp.HealthText.Color = Color3.new(1, 1, 1)
-                esp.HealthText.Position = Vector2.new(barX + barWidth / 2, barY - 10)
-                esp.HealthText.Text = math.floor(humanoid.Health) .. "/" .. math.floor(humanoid.MaxHealth)
-                
-                -- 更新线条
-                esp.Tracer.Visible = true
-                esp.Tracer.Color = color
-                
-                -- 根据选择的位置设置线条起点
-                local startPoint
-                if tracerPosition == "Top" then
-                    startPoint = Vector2.new(Camera.ViewportSize.X/2, 0)  -- 屏幕顶部中心
-                else
-                    startPoint = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y)  -- 屏幕底部中心
-                end
-                
-                -- 线条终点为玩家身体中心
-                local endPoint = Vector2.new(headPos.X, headPos.Y + height/2)
-                
-                esp.Tracer.From = startPoint
-                esp.Tracer.To = endPoint
+                -- 启动飞行循环
+                flyConnection = game:GetService("RunService").Heartbeat:Connect(flyLoop)
             end
             
-            -- 清理不存在的玩家ESP
-            for plr, esp in pairs(espCache) do
-                if not plr or not plr.Parent or plr == LocalPlayer then
-                    for _, obj in pairs(esp) do
-                        obj.Visible = false
-                        obj:Remove()
+            local function stopFlying()
+                if not flying then return end
+                flying = false
+                
+                -- 清理飞行组件
+                if bg then bg:Destroy() end
+                if bv then bv:Destroy() end
+                if flyConnection then flyConnection:Disconnect() end
+                
+                -- 恢复角色状态
+                local character = game.Players.LocalPlayer.Character
+                if character then
+                    local humanoid = character:FindFirstChildOfClass("Humanoid")
+                    if humanoid then
+                        humanoid.PlatformStand = false
                     end
-                    espCache[plr] = nil
-                end
-            end
-        end
-        
-        -- 启动ESP循环
-        local espLoop
-        local espSection = Tab4:AddSection({Name = "玩家透视"})
-        espSection:AddToggle({
-            Name = "增强玩家 ESP", 
-            Default = false, 
-            Callback = function(v)
-                espEnabled = v
-                if v then
-                    if not espLoop then
-                        espLoop = game:GetService("RunService").RenderStepped:Connect(updateESP)
-                    end
-                else
-                    if espLoop then
-                        espLoop:Disconnect()
-                        espLoop = nil
-                    end
-                    -- 清理缓存
-                    for plr, esp in pairs(espCache) do
-                        for _, obj in pairs(esp) do
-                            pcall(function() obj:Remove() end)
-                        end
-                    end
-                    table.clear(espCache)
-                end
-            end
-        })
-        
-        -- 添加线条位置选择
-        espSection:AddDropdown({
-            Name = "线条位置",
-            Default = tracerPosition,
-            Options = {"Top", "Bottom"},
-            Callback = function(value)
-                tracerPosition = value
-            end
-        })
-        
-        -----------------------------------------------------------------
-        -- ⑨ NPC 透视（增强版）
-        -----------------------------------------------------------------
-        local npcEspEnabled = false
-        local npcEspCache = {}
-        
-        -- 创建NPC ESP对象
-        local function createNpcESPObject(model)
-            local esp = {
-                Box = Drawing.new("Quad"),
-                Name = Drawing.new("Text"),
-                Distance = Drawing.new("Text")
-            }
-            
-            -- 设置初始属性
-            esp.Box.Thickness = 1.5
-            esp.Box.Filled = false
-            esp.Box.Color = Color3.fromRGB(255, 165, 0)
-            esp.Box.ZIndex = 4
-            
-            esp.Name.Size = 16
-            esp.Name.Center = true
-            esp.Name.Outline = true
-            esp.Name.Color = Color3.fromRGB(255, 165, 0)
-            esp.Name.ZIndex = 4
-            
-            esp.Distance.Size = 14
-            esp.Distance.Center = true
-            esp.Distance.Outline = true
-            esp.Distance.Color = Color3.fromRGB(255, 165, 0)
-            esp.Distance.ZIndex = 4
-            
-            npcEspCache[model] = esp
-            return esp
-        end
-        
-        -- 更新NPC ESP
-        local function updateNpcESP()
-            if not npcEspEnabled then return end
-            
-            for _, model in ipairs(workspace:GetDescendants()) do
-                if model:IsA("Model") and model:FindFirstChildOfClass("Humanoid") and not Players:GetPlayerFromCharacter(model) then
-                    local root = model:FindFirstChild("HumanoidRootPart") or model:FindFirstChild("Torso")
-                    local head = model:FindFirstChild("Head")
                     
-                    if not (root and head) then
-                        if npcEspCache[model] then
-                            for _, obj in pairs(npcEspCache[model]) do
+                    local animate = character:FindFirstChild("Animate")
+                    if animate then
+                        animate.Disabled = false
+                    end
+                end
+                
+                -- 重置控制变量
+                ctrl = {f = 0, b = 0, l = 0, r = 0, u = 0, d = 0}
+                
+                OrionLib:MakeNotification({
+                    Name = "飞行模式",
+                    Content = "飞行已禁用",
+                    Time = 3
+                })
+            end
+            
+            -- 键盘输入处理 (优化版本)
+            local inputBeganConn, inputEndedConn
+            
+            local function setupInput()
+                -- 清除旧连接
+                if inputBeganConn then inputBeganConn:Disconnect() end
+                if inputEndedConn then inputEndedConn:Disconnect() end
+                
+                -- 键盘按下事件
+                inputBeganConn = game:GetService("UserInputService").InputBegan:Connect(function(input)
+                    if not flying then return end
+                    
+                    if input.KeyCode == Enum.KeyCode.W then
+                        ctrl.f = 1
+                    elseif input.KeyCode == Enum.KeyCode.S then
+                        ctrl.b = 1
+                    elseif input.KeyCode == Enum.KeyCode.A then
+                        ctrl.l = 1
+                    elseif input.KeyCode == Enum.KeyCode.D then
+                        ctrl.r = 1
+                    elseif input.KeyCode == Enum.KeyCode.Space then
+                        ctrl.u = 1
+                    elseif input.KeyCode == Enum.KeyCode.LeftControl or input.KeyCode == Enum.KeyCode.ButtonL3 then
+                        ctrl.d = 1
+                    end
+                end)
+                
+                -- 键盘释放事件
+                inputEndedConn = game:GetService("UserInputService").InputEnded:Connect(function(input)
+                    if not flying then return end
+                    
+                    if input.KeyCode == Enum.KeyCode.W then
+                        ctrl.f = 0
+                    elseif input.KeyCode == Enum.KeyCode.S then
+                        ctrl.b = 0
+                    elseif input.KeyCode == Enum.KeyCode.A then
+                        ctrl.l = 0
+                    elseif input.KeyCode == Enum.KeyCode.D then
+                        ctrl.r = 0
+                    elseif input.KeyCode == Enum.KeyCode.Space then
+                        ctrl.u = 0
+                    elseif input.KeyCode == Enum.KeyCode.LeftControl or input.KeyCode == Enum.KeyCode.ButtonL3 then
+                        ctrl.d = 0
+                    end
+                end)
+            end
+            
+            -- 角色死亡时自动停止飞行
+            game.Players.LocalPlayer.CharacterAdded:Connect(function()
+                stopFlying()
+            end)
+            
+            -- 创建飞行控制UI
+            local flySection = Tab4:AddSection({Name = "飞行功能"})
+            
+            flySection:AddToggle({
+                Name = "启用飞行",
+                Default = false,
+                Callback = function(v)
+                    if v then
+                        startFlying()
+                        setupInput()
+                    else
+                        stopFlying()
+                    end
+                end
+            })
+            
+            flySection:AddSlider({
+                Name = "飞行速度",
+                Min = 10,
+                Max = 200,
+                Default = flySpeed,
+                Increment = 5,
+                Callback = function(value)
+                    flySpeed = value
+                    if flying then
+                        OrionLib:MakeNotification({
+                            Name = "飞行模式",
+                            Content = "飞行速度更新为: " .. flySpeed,
+                            Time = 2
+                        })
+                    end
+                end
+            })
+            
+            flySection:AddLabel("控制方式:")
+            flySection:AddLabel("W/A/S/D - 前后左右移动")
+            flySection:AddLabel("空格键 - 向上飞行")
+            flySection:AddLabel("Ctrl键 - 向下飞行")        
+            
+            -----------------------------------------------------------------
+            -- ⑧ 增强版玩家 ESP（含队伍检测、距离、血条和线条绘制）
+            -----------------------------------------------------------------
+            local espEnabled = false
+            local espCache = {}
+            local tracerPosition = "Bottom"  -- 线条位置: "Top" 或 "Bottom"
+            
+            -- 获取队伍颜色
+            local function getTeamColor(plr)
+                if plr.Team and LocalPlayer.Team and plr.Team == LocalPlayer.Team then
+                    return Color3.fromRGB(0, 255, 0) -- 队友绿色
+                else
+                    return Color3.fromRGB(255, 0, 0) -- 敌人红色
+                end
+            end
+            
+            -- 创建ESP对象
+            local function createESPObject(plr)
+                local esp = {
+                    Box = Drawing.new("Quad"),
+                    Name = Drawing.new("Text"),
+                    Distance = Drawing.new("Text"),
+                    HealthBar = Drawing.new("Quad"),
+                    HealthText = Drawing.new("Text"),
+                    Tracer = Drawing.new("Line")  -- 新增线条
+                }
+                
+                -- 设置初始属性
+                esp.Box.Thickness = 1.5
+                esp.Box.Filled = false
+                esp.Box.ZIndex = 5
+                
+                esp.Name.Size = 18
+                esp.Name.Center = true
+                esp.Name.Outline = true
+                esp.Name.ZIndex = 6
+                
+                esp.Distance.Size = 16
+                esp.Distance.Center = true
+                esp.Distance.Outline = true
+                esp.Distance.ZIndex = 6
+                
+                esp.HealthBar.Filled = true
+                esp.HealthBar.Thickness = 1
+                esp.HealthBar.ZIndex = 5
+                
+                esp.HealthText.Size = 14
+                esp.HealthText.Center = true
+                esp.HealthText.Outline = true
+                esp.HealthText.ZIndex = 6
+                
+                esp.Tracer.Thickness = 1.5  -- 线条粗细
+                esp.Tracer.ZIndex = 4
+                
+                espCache[plr] = esp
+                return esp
+            end
+            
+            -- 更新ESP
+            local function updateESP()
+                if not espEnabled then return end
+                
+                for _, plr in ipairs(Players:GetPlayers()) do
+                    if plr == LocalPlayer then continue end
+                    
+                    local char = plr.Character
+                    if not char then
+                        if espCache[plr] then
+                            for _, obj in pairs(espCache[plr]) do
                                 obj.Visible = false
                             end
                         end
-                        continue
-                    end
+                        continue end
+                    
+                    local root = char:FindFirstChild("HumanoidRootPart")
+                    local head = char:FindFirstChild("Head")
+                    local humanoid = char:FindFirstChildOfClass("Humanoid")
+                    
+                    if not (root and head and humanoid) then continue end
                     
                     -- 获取屏幕位置
                     local rootPos, rootVis = Camera:WorldToViewportPoint(root.Position)
                     local headPos, headVis = Camera:WorldToViewportPoint(head.Position + Vector3.new(0, 1.5, 0))
                     
                     if not (rootVis and headVis) then
-                        if npcEspCache[model] then
-                            for _, obj in pairs(npcEspCache[model]) do
+                        if espCache[plr] then
+                            for _, obj in pairs(espCache[plr]) do
                                 obj.Visible = false
                             end
                         end
                         continue
                     end
                     
-                    -- 创建或获取NPC ESP对象
-                    local esp = npcEspCache[model] or createNpcESPObject(model)
+                    -- 创建或获取ESP对象
+                    local esp = espCache[plr] or createESPObject(plr)
                     
                     -- 计算尺寸
                     local height = math.abs(headPos.Y - rootPos.Y) * 1.5
@@ -1187,8 +1000,12 @@ end
                     local left = headPos.X - width / 2
                     local right = headPos.X + width / 2
                     
+                    -- 设置颜色
+                    local color = getTeamColor(plr)
+                    
                     -- 更新方框
                     esp.Box.Visible = true
+                    esp.Box.Color = color
                     esp.Box.PointA = Vector2.new(left, headPos.Y)
                     esp.Box.PointB = Vector2.new(right, headPos.Y)
                     esp.Box.PointC = Vector2.new(right, headPos.Y + height)
@@ -1196,770 +1013,964 @@ end
                     
                     -- 更新名字
                     esp.Name.Visible = true
-                    esp.Name.Position = Vector2.new(headPos.X, headPos.Y - 15)
-                    esp.Name.Text = model.Name
+                    esp.Name.Color = color
+                    esp.Name.Position = Vector2.new(headPos.X, headPos.Y - 20)
+                    esp.Name.Text = plr.Name
                     
                     -- 更新距离
                     local distance = math.floor((root.Position - Camera.CFrame.Position).Magnitude)
                     esp.Distance.Visible = true
+                    esp.Distance.Color = color
                     esp.Distance.Position = Vector2.new(headPos.X, headPos.Y + height + 5)
                     esp.Distance.Text = tostring(distance) .. "m"
+                    
+                    -- 更新血条
+                    local healthPercent = math.clamp(humanoid.Health / humanoid.MaxHealth, 0, 1)
+                    local barWidth = width
+                    local barHeight = 5
+                    local barX = left
+                    local barY = headPos.Y + height + 20
+                    
+                    esp.HealthBar.Visible = true
+                    esp.HealthBar.Color = Color3.new(1 - healthPercent, healthPercent, 0)
+                    esp.HealthBar.PointA = Vector2.new(barX, barY)
+                    esp.HealthBar.PointB = Vector2.new(barX + barWidth * healthPercent, barY)
+                    esp.HealthBar.PointC = Vector2.new(barX + barWidth * healthPercent, barY + barHeight)
+                    esp.HealthBar.PointD = Vector2.new(barX, barY + barHeight)
+                    
+                    -- 更新血量文本
+                    esp.HealthText.Visible = true
+                    esp.HealthText.Color = Color3.new(1, 1, 1)
+                    esp.HealthText.Position = Vector2.new(barX + barWidth / 2, barY - 10)
+                    esp.HealthText.Text = math.floor(humanoid.Health) .. "/" .. math.floor(humanoid.MaxHealth)
+                    
+                    -- 更新线条
+                    esp.Tracer.Visible = true
+                    esp.Tracer.Color = color
+                    
+                    -- 根据选择的位置设置线条起点
+                    local startPoint
+                    if tracerPosition == "Top" then
+                        startPoint = Vector2.new(Camera.ViewportSize.X/2, 0)  -- 屏幕顶部中心
+                    else
+                        startPoint = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y)  -- 屏幕底部中心
+                    end
+                    
+                    -- 线条终点为玩家身体中心
+                    local endPoint = Vector2.new(headPos.X, headPos.Y + height/2)
+                    
+                    esp.Tracer.From = startPoint
+                    esp.Tracer.To = endPoint
                 end
-            end
-            
-            -- 清理不存在的NPC ESP
-            for model, esp in pairs(npcEspCache) do
-                if not model or not model.Parent then
-                    for _, obj in pairs(esp) do
-                        obj.Visible = false
-                        obj:Remove()
-                    end
-                    npcEspCache[model] = nil
-                end
-            end
-        end
-        
-        -- 启动NPC ESP循环
-        local npcEspLoop
-        Tab4:AddToggle({
-            Name = "增强NPC透视", 
-            Default = false, 
-            Callback = function(v)
-                npcEspEnabled = v
-                if v then
-                    if not npcEspLoop then
-                        npcEspLoop = game:GetService("RunService").RenderStepped:Connect(updateNpcESP)
-                    end
-                else
-                    if npcEspLoop then
-                        npcEspLoop:Disconnect()
-                        npcEspLoop = nil
-                    end
-                    -- 清理缓存
-                    for model, esp in pairs(npcEspCache) do
+                
+                -- 清理不存在的玩家ESP
+                for plr, esp in pairs(espCache) do
+                    if not plr or not plr.Parent or plr == LocalPlayer then
                         for _, obj in pairs(esp) do
-                            pcall(function() obj:Remove() end)
+                            obj.Visible = false
+                            obj:Remove()
                         end
+                        espCache[plr] = nil
                     end
-                    table.clear(npcEspCache)
                 end
             end
-        })
-        -----------------------------------------------------------------
-        -- ⑩ 三锁定：移速 / 跳跃 / 重力
-        -----------------------------------------------------------------
-        local lockSpeed, lockJump, lockGrav = false, false, false
-        local savedSpeed, savedJump, savedGrav = 16, 50, 196
-        
-        local function applyValues()
-            local char = LocalPlayer.Character
-            if not char then return end
             
-            local hum = char:FindFirstChildOfClass("Humanoid")
-            if not hum then return end
+            -- 启动ESP循环
+            local espLoop
+            local espSection = Tab4:AddSection({Name = "玩家透视"})
+            espSection:AddToggle({
+                Name = "增强玩家 ESP", 
+                Default = false, 
+                Callback = function(v)
+                    espEnabled = v
+                    if v then
+                        if not espLoop then
+                            espLoop = game:GetService("RunService").RenderStepped:Connect(updateESP)
+                        end
+                    else
+                        if espLoop then
+                            espLoop:Disconnect()
+                            espLoop = nil
+                        end
+                        -- 清理缓存
+                        for plr, esp in pairs(espCache) do
+                            for _, obj in pairs(esp) do
+                                pcall(function() obj:Remove() end)
+                            end
+                        end
+                        table.clear(espCache)
+                    end
+                end
+            })
             
-            if lockSpeed then hum.WalkSpeed = savedSpeed end
-            if lockJump then hum.JumpPower = savedJump end
-            if lockGrav then workspace.Gravity = savedGrav end
-        end
-        
-        LocalPlayer.CharacterAdded:Connect(function()
-            task.wait(0.5)
-            applyValues()
-        end)
-        
-        -- 输入框 + 开关
-        local lockSec = Tab4:AddSection({Name = "三锁定"})
-        lockSec:AddTextbox({
-            Name = "设定移速（仅保存值）", 
-            Default = tostring(savedSpeed), 
-            Callback = function(txt) 
-                savedSpeed = tonumber(txt) or 16 
-                applyValues()
+            -- 添加线条位置选择
+            espSection:AddDropdown({
+                Name = "线条位置",
+                Default = tracerPosition,
+                Options = {"Top", "Bottom"},
+                Callback = function(value)
+                    tracerPosition = value
+                end
+            })
+            
+            -----------------------------------------------------------------
+            -- ⑨ NPC 透视（增强版）
+            -----------------------------------------------------------------
+            local npcEspEnabled = false
+            local npcEspCache = {}
+            
+            -- 创建NPC ESP对象
+            local function createNpcESPObject(model)
+                local esp = {
+                    Box = Drawing.new("Quad"),
+                    Name = Drawing.new("Text"),
+                    Distance = Drawing.new("Text")
+                }
+                
+                -- 设置初始属性
+                esp.Box.Thickness = 1.5
+                esp.Box.Filled = false
+                esp.Box.Color = Color3.fromRGB(255, 165, 0)
+                esp.Box.ZIndex = 4
+                
+                esp.Name.Size = 16
+                esp.Name.Center = true
+                esp.Name.Outline = true
+                esp.Name.Color = Color3.fromRGB(255, 165, 0)
+                esp.Name.ZIndex = 4
+                
+                esp.Distance.Size = 14
+                esp.Distance.Center = true
+                esp.Distance.Outline = true
+                esp.Distance.Color = Color3.fromRGB(255, 165, 0)
+                esp.Distance.ZIndex = 4
+                
+                npcEspCache[model] = esp
+                return esp
             end
-        })
-        lockSec:AddTextbox({
-            Name = "设定跳跃高度（仅保存值）", 
-            Default = tostring(savedJump), 
-            Callback = function(txt) 
-                savedJump = tonumber(txt) or 50 
-                applyValues()
+            
+            -- 更新NPC ESP
+            local function updateNpcESP()
+                if not npcEspEnabled then return end
+                
+                for _, model in ipairs(workspace:GetDescendants()) do
+                    if model:IsA("Model") and model:FindFirstChildOfClass("Humanoid") and not Players:GetPlayerFromCharacter(model) then
+                        local root = model:FindFirstChild("HumanoidRootPart") or model:FindFirstChild("Torso")
+                        local head = model:FindFirstChild("Head")
+                        
+                        if not (root and head) then
+                            if npcEspCache[model] then
+                                for _, obj in pairs(npcEspCache[model]) do
+                                    obj.Visible = false
+                                end
+                            end
+                            continue
+                        end
+                        
+                        -- 获取屏幕位置
+                        local rootPos, rootVis = Camera:WorldToViewportPoint(root.Position)
+                        local headPos, headVis = Camera:WorldToViewportPoint(head.Position + Vector3.new(0, 1.5, 0))
+                        
+                        if not (rootVis and headVis) then
+                            if npcEspCache[model] then
+                                for _, obj in pairs(npcEspCache[model]) do
+                                    obj.Visible = false
+                                end
+                            end
+                            continue
+                        end
+                        
+                        -- 创建或获取NPC ESP对象
+                        local esp = npcEspCache[model] or createNpcESPObject(model)
+                        
+                        -- 计算尺寸
+                        local height = math.abs(headPos.Y - rootPos.Y) * 1.5
+                        local width = height * 0.6
+                        local left = headPos.X - width / 2
+                        local right = headPos.X + width / 2
+                        
+                        -- 更新方框
+                        esp.Box.Visible = true
+                        esp.Box.PointA = Vector2.new(left, headPos.Y)
+                        esp.Box.PointB = Vector2.new(right, headPos.Y)
+                        esp.Box.PointC = Vector2.new(right, headPos.Y + height)
+                        esp.Box.PointD = Vector2.new(left, headPos.Y + height)
+                        
+                        -- 更新名字
+                        esp.Name.Visible = true
+                        esp.Name.Position = Vector2.new(headPos.X, headPos.Y - 15)
+                        esp.Name.Text = model.Name
+                        
+                        -- 更新距离
+                        local distance = math.floor((root.Position - Camera.CFrame.Position).Magnitude)
+                        esp.Distance.Visible = true
+                        esp.Distance.Position = Vector2.new(headPos.X, headPos.Y + height + 5)
+                        esp.Distance.Text = tostring(distance) .. "m"
+                    end
+                end
+                
+                -- 清理不存在的NPC ESP
+                for model, esp in pairs(npcEspCache) do
+                    if not model or not model.Parent then
+                        for _, obj in pairs(esp) do
+                            obj.Visible = false
+                            obj:Remove()
+                        end
+                        npcEspCache[model] = nil
+                    end
+                end
             end
-        })
-        lockSec:AddTextbox({
-            Name = "设定重力值（仅保存值）", 
-            Default = tostring(savedGrav), 
-            Callback = function(txt) 
-                savedGrav = tonumber(txt) or 196 
-                applyValues()
+            
+            -- 启动NPC ESP循环
+            local npcEspLoop
+            Tab4:AddToggle({
+                Name = "增强NPC透视", 
+                Default = false, 
+                Callback = function(v)
+                    npcEspEnabled = v
+                    if v then
+                        if not npcEspLoop then
+                            npcEspLoop = game:GetService("RunService").RenderStepped:Connect(updateNpcESP)
+                        end
+                    else
+                        if npcEspLoop then
+                            npcEspLoop:Disconnect()
+                            npcEspLoop = nil
+                        end
+                        -- 清理缓存
+                        for model, esp in pairs(npcEspCache) do
+                            for _, obj in pairs(esp) do
+                                pcall(function() obj:Remove() end)
+                            end
+                        end
+                        table.clear(npcEspCache)
+                    end
+                end
+            })
+            -----------------------------------------------------------------
+            -- ⑩ 三锁定：移速 / 跳跃 / 重力
+            -----------------------------------------------------------------
+            local lockSpeed, lockJump, lockGrav = false, false, false
+            local savedSpeed, savedJump, savedGrav = 16, 50, 196
+            
+            local function applyValues()
+                local char = LocalPlayer.Character
+                if not char then return end
+                
+                local hum = char:FindFirstChildOfClass("Humanoid")
+                if not hum then return end
+                
+                if lockSpeed then hum.WalkSpeed = savedSpeed end
+                if lockJump then hum.JumpPower = savedJump end
+                if lockGrav then workspace.Gravity = savedGrav end
             end
-        })
-        
-        lockSec:AddToggle({
-            Name = "锁定移速", 
-            Default = false, 
-            Callback = function(v) 
-                lockSpeed = v
+            
+            LocalPlayer.CharacterAdded:Connect(function()
+                task.wait(0.5)
                 applyValues()
-            end
-        })
-        lockSec:AddToggle({
-            Name = "锁定跳跃", 
-            Default = false, 
-            Callback = function(v) 
-                lockJump = v
-                applyValues()
-            end
-        })
-        lockSec:AddToggle({
-            Name = "锁定重力", 
-            Default = false, 
-            Callback = function(v) 
-                lockGrav = v
-                applyValues()
-            end
-        })
-        
+            end)
+            
+            -- 输入框 + 开关
+            local lockSec = Tab4:AddSection({Name = "三锁定"})
+            lockSec:AddTextbox({
+                Name = "设定移速（仅保存值）", 
+                Default = tostring(savedSpeed), 
+                Callback = function(txt) 
+                    savedSpeed = tonumber(txt) or 16 
+                    applyValues()
+                end
+            })
+            lockSec:AddTextbox({
+                Name = "设定跳跃高度（仅保存值）", 
+                Default = tostring(savedJump), 
+                Callback = function(txt) 
+                    savedJump = tonumber(txt) or 50 
+                    applyValues()
+                end
+            })
+            lockSec:AddTextbox({
+                Name = "设定重力值（仅保存值）", 
+                Default = tostring(savedGrav), 
+                Callback = function(txt) 
+                    savedGrav = tonumber(txt) or 196 
+                    applyValues()
+                end
+            })
+            
+            lockSec:AddToggle({
+                Name = "锁定移速", 
+                Default = false, 
+                Callback = function(v) 
+                    lockSpeed = v
+                    applyValues()
+                end
+            })
+            lockSec:AddToggle({
+                Name = "锁定跳跃", 
+                Default = false, 
+                Callback = function(v) 
+                    lockJump = v
+                    applyValues()
+                end
+            })
+            lockSec:AddToggle({
+                Name = "锁定重力", 
+                Default = false, 
+                Callback = function(v) 
+                    lockGrav = v
+                    applyValues()
+                end
+            })
+            
 
-    -----------------------------------------------------------------
-    -- 子弹追踪系统 (添加到人物功能Tab)
-    -----------------------------------------------------------------
-    local bulletTrackingEnabled = false
-    local trackingMethod = "Linear"  -- 默认追踪方法
-    local hitRate = 100              -- 默认命中率100%
-    local wallPenetration = false    -- 默认不穿墙
-    local showTargetInfo = true      -- 默认显示目标信息
-    local aimMode = "Distance"       -- 默认距离瞄准
-    local showTargetLine = true      -- 默认显示目标线条
-    local maxDistance = 300          -- 默认最大距离300米
-    
-    -- 追踪方法列表 (9种)
-    local trackingMethods = {
-        "Linear",            -- 1. 直线追踪
-        "Predictive",        -- 2. 预测追踪
-        "Curved",            -- 3. 曲线追踪
-        "Homing",            -- 4. 制导追踪
-        "Randomized",        -- 5. 随机扰动
-        "LagCompensated",    -- 6. 延迟补偿
-        "HeatSeeking",       -- 7. 热追踪
-        "Bouncing",          -- 8. 弹跳追踪
-        "Teleporting"        -- 9. 瞬移追踪
-    }
-    
-    -- 目标信息显示
-    local targetInfo = Drawing.new("Text")
-    targetInfo.Visible = false
-    targetInfo.Size = 18
-    targetInfo.Color = Color3.new(1, 1, 1)
-    targetInfo.Outline = true
-    targetInfo.OutlineColor = Color3.new(0, 0, 0)
-    targetInfo.Position = Vector2.new(10, 10)
-    targetInfo.Text = "目标: 无"
-    
-    -- 目标线条
-    local targetLine = Drawing.new("Line")
-    targetLine.Visible = false
-    targetLine.Thickness = 2
-    targetLine.Color = Color3.fromRGB(255, 50, 50)
-    targetLine.ZIndex = 10
-    
-    -- 获取当前目标
-    local function getTrackingTarget()
-        local closest, minDist = nil, math.huge
-        local camera = workspace.CurrentCamera
-        local localPlayer = game.Players.LocalPlayer
-        local mousePos = UserInputService:GetMouseLocation()
-        local center = Vector2.new(camera.ViewportSize.X/2, camera.ViewportSize.Y/2)
+        -----------------------------------------------------------------
+        -- 子弹追踪系统 (添加到人物功能Tab)
+        -----------------------------------------------------------------
+        local bulletTrackingEnabled = false
+        local trackingMethod = "Linear"  -- 默认追踪方法
+        local hitRate = 100              -- 默认命中率100%
+        local wallPenetration = false    -- 默认不穿墙
+        local showTargetInfo = true      -- 默认显示目标信息
+        local aimMode = "Distance"       -- 默认距离瞄准
+        local showTargetLine = true      -- 默认显示目标线条
+        local maxDistance = 300          -- 默认最大距离300米
         
-        for _, plr in ipairs(Players:GetPlayers()) do
-            if plr == localPlayer then continue end
-            if aimbotCheckTeam and plr.Team and plr.Team == localPlayer.Team then continue end
+        -- 追踪方法列表 (9种)
+        local trackingMethods = {
+            "Linear",            -- 1. 直线追踪
+            "Predictive",        -- 2. 预测追踪
+            "Curved",            -- 3. 曲线追踪
+            "Homing",            -- 4. 制导追踪
+            "Randomized",        -- 5. 随机扰动
+            "LagCompensated",    -- 6. 延迟补偿
+            "HeatSeeking",       -- 7. 热追踪
+            "Bouncing",          -- 8. 弹跳追踪
+            "Teleporting"        -- 9. 瞬移追踪
+        }
+        
+        -- 目标信息显示
+        local targetInfo = Drawing.new("Text")
+        targetInfo.Visible = false
+        targetInfo.Size = 18
+        targetInfo.Color = Color3.new(1, 1, 1)
+        targetInfo.Outline = true
+        targetInfo.OutlineColor = Color3.new(0, 0, 0)
+        targetInfo.Position = Vector2.new(10, 10)
+        targetInfo.Text = "目标: 无"
+        
+        -- 目标线条
+        local targetLine = Drawing.new("Line")
+        targetLine.Visible = false
+        targetLine.Thickness = 2
+        targetLine.Color = Color3.fromRGB(255, 50, 50)
+        targetLine.ZIndex = 10
+        
+        -- 获取当前目标
+        local function getTrackingTarget()
+            local closest, minDist = nil, math.huge
+            local camera = workspace.CurrentCamera
+            local localPlayer = game.Players.LocalPlayer
+            local mousePos = UserInputService:GetMouseLocation()
+            local center = Vector2.new(camera.ViewportSize.X/2, camera.ViewportSize.Y/2)
             
-            local char = plr.Character
-            if not char then continue end
-            
-            local root = char:FindFirstChild("HumanoidRootPart")
-            local head = char:FindFirstChild("Head")
-            if not (root and head) then continue end
-            
-            -- 计算位置
-            local pos = head.Position
-            local screenPos = camera:WorldToViewportPoint(pos)
-            if screenPos.Z <= 0 then continue end
-            
-            -- 检查距离
-            local distance = (root.Position - camera.CFrame.Position).Magnitude
-            if aimMode == "Distance" and distance > maxDistance then continue end
-            
-            -- 检查是否在FOV内
-            local screenVec = Vector2.new(screenPos.X, screenPos.Y)
-            local distToCenter = (screenVec - center).Magnitude
-            
-            if aimMode == "Crosshair" and distToCenter > fixedFOV then
-                continue
+            for _, plr in ipairs(Players:GetPlayers()) do
+                if plr == localPlayer then continue end
+                if aimbotCheckTeam and plr.Team and plr.Team == localPlayer.Team then continue end
+                
+                local char = plr.Character
+                if not char then continue end
+                
+                local root = char:FindFirstChild("HumanoidRootPart")
+                local head = char:FindFirstChild("Head")
+                if not (root and head) then continue end
+                
+                -- 计算位置
+                local pos = head.Position
+                local screenPos = camera:WorldToViewportPoint(pos)
+                if screenPos.Z <= 0 then continue end
+                
+                -- 检查距离
+                local distance = (root.Position - camera.CFrame.Position).Magnitude
+                if aimMode == "Distance" and distance > maxDistance then continue end
+                
+                -- 检查是否在FOV内
+                local screenVec = Vector2.new(screenPos.X, screenPos.Y)
+                local distToCenter = (screenVec - center).Magnitude
+                
+                if aimMode == "Crosshair" and distToCenter > fixedFOV then
+                    continue
+                end
+                
+                -- 墙体检测
+                if not wallPenetration then
+                    local ignoreList = {localPlayer.Character, camera}
+                    local origin = camera.CFrame.Position
+                    local direction = (pos - origin).Unit
+                    local ray = Ray.new(origin, direction * (origin - pos).Magnitude)
+                    local part = workspace:FindPartOnRayWithIgnoreList(ray, ignoreList)
+                    if part and not part:IsDescendantOf(char) then continue end
+                end
+                
+                -- 选择最近目标
+                local dist = (aimMode == "Distance") and distance or distToCenter
+                if dist < minDist then
+                    minDist, closest = dist, plr
+                end
             end
             
-            -- 墙体检测
-            if not wallPenetration then
-                local ignoreList = {localPlayer.Character, camera}
-                local origin = camera.CFrame.Position
-                local direction = (pos - origin).Unit
-                local ray = Ray.new(origin, direction * (origin - pos).Magnitude)
-                local part = workspace:FindPartOnRayWithIgnoreList(ray, ignoreList)
-                if part and not part:IsDescendantOf(char) then continue end
-            end
-            
-            -- 选择最近目标
-            local dist = (aimMode == "Distance") and distance or distToCenter
-            if dist < minDist then
-                minDist, closest = dist, plr
-            end
+            return closest
         end
         
-        return closest
-    end
-    
-    -- 应用命中率
-    local function applyHitRate(success)
-        if hitRate >= 100 then return success end
-        if hitRate <= 0 then return false end
-        
-        local chance = math.random(1, 100)
-        if chance <= hitRate then
-            return success
+        -- 应用命中率
+        local function applyHitRate(success)
+            if hitRate >= 100 then return success end
+            if hitRate <= 0 then return false end
+            
+            local chance = math.random(1, 100)
+            if chance <= hitRate then
+                return success
+            end
+            return false
         end
-        return false
-    end
-    
-    -- 追踪方法实现
-    local function applyTrackingMethod(targetChar, bullet)
-        if not targetChar then return end
         
-        local head = targetChar:FindFirstChild("Head")
-        local root = targetChar:FindFirstChild("HumanoidRootPart")
-        if not (head and root) then return end
-        
-        local targetPos = head.Position
-        
-        -- 根据追踪方法调整目标位置
-        if trackingMethod == "Predictive" then
-            -- 预测目标移动
-            local velocity = root.Velocity
-            local distance = (targetPos - bullet.Position).Magnitude
-            local timeToTarget = distance / 1000  -- 假设子弹速度1000m/s
-            targetPos = targetPos + velocity * timeToTarget
-        
-        elseif trackingMethod == "Curved" then
-            -- 曲线追踪
-            local direction = (targetPos - bullet.Position).Unit
-            local curveAmount = 0.3
-            local curveDirection = Vector3.new(math.random(-100,100)/100, math.random(50,100)/100, math.random(-100,100)/100).Unit
-            targetPos = targetPos + direction * curveAmount + curveDirection * curveAmount * 0.5
-        
-        elseif trackingMethod == "Homing" then
-            -- 制导追踪 (逐步调整方向)
-            if bullet:FindFirstChild("LastTargetPos") then
-                local lastPos = bullet.LastTargetPos.Value
-                local direction = (targetPos - lastPos).Unit * 5
-                targetPos = targetPos + direction
+        -- 追踪方法实现
+        local function applyTrackingMethod(targetChar, bullet)
+            if not targetChar then return end
+            
+            local head = targetChar:FindFirstChild("Head")
+            local root = targetChar:FindFirstChild("HumanoidRootPart")
+            if not (head and root) then return end
+            
+            local targetPos = head.Position
+            
+            -- 根据追踪方法调整目标位置
+            if trackingMethod == "Predictive" then
+                -- 预测目标移动
+                local velocity = root.Velocity
+                local distance = (targetPos - bullet.Position).Magnitude
+                local timeToTarget = distance / 1000  -- 假设子弹速度1000m/s
+                targetPos = targetPos + velocity * timeToTarget
+            
+            elseif trackingMethod == "Curved" then
+                -- 曲线追踪
+                local direction = (targetPos - bullet.Position).Unit
+                local curveAmount = 0.3
+                local curveDirection = Vector3.new(math.random(-100,100)/100, math.random(50,100)/100, math.random(-100,100)/100).Unit
+                targetPos = targetPos + direction * curveAmount + curveDirection * curveAmount * 0.5
+            
+            elseif trackingMethod == "Homing" then
+                -- 制导追踪 (逐步调整方向)
+                if bullet:FindFirstChild("LastTargetPos") then
+                    local lastPos = bullet.LastTargetPos.Value
+                    local direction = (targetPos - lastPos).Unit * 5
+                    targetPos = targetPos + direction
+                end
+                
+                -- 保存当前位置供下一帧使用
+                if not bullet:FindFirstChild("LastTargetPos") then
+                    local value = Instance.new("Vector3Value")
+                    value.Name = "LastTargetPos"
+                    value.Value = targetPos
+                    value.Parent = bullet
+                else
+                    bullet.LastTargetPos.Value = targetPos
+                end
+            
+            elseif trackingMethod == "Randomized" then
+                -- 随机扰动
+                local randomOffset = Vector3.new(
+                    math.random(-100,100)/100,
+                    math.random(-50,50)/100,
+                    math.random(-100,100)/100
+                ) * 2
+                targetPos = targetPos + randomOffset
+            
+            elseif trackingMethod == "LagCompensated" then
+                -- 延迟补偿
+                local ping = 0.1  -- 假设100ms延迟
+                targetPos = targetPos + root.Velocity * ping
+            
+            elseif trackingMethod == "HeatSeeking" then
+                -- 热追踪 (忽略障碍)
+                -- 这里不需要额外处理，因为已经处理了穿墙
+            
+            elseif trackingMethod == "Bouncing" then
+                -- 弹跳追踪 (模拟弹道)
+                local direction = (targetPos - bullet.Position).Unit
+                local upVector = Vector3.new(0, 1, 0)
+                targetPos = targetPos + direction * 0.7 + upVector * 0.3
+            
+            elseif trackingMethod == "Teleporting" then
+                -- 瞬移追踪 (直接传送到目标)
+                bullet.CFrame = CFrame.new(targetPos)
+                return true
             end
             
-            -- 保存当前位置供下一帧使用
-            if not bullet:FindFirstChild("LastTargetPos") then
-                local value = Instance.new("Vector3Value")
-                value.Name = "LastTargetPos"
-                value.Value = targetPos
-                value.Parent = bullet
-            else
-                bullet.LastTargetPos.Value = targetPos
-            end
-        
-        elseif trackingMethod == "Randomized" then
-            -- 随机扰动
-            local randomOffset = Vector3.new(
-                math.random(-100,100)/100,
-                math.random(-50,50)/100,
-                math.random(-100,100)/100
-            ) * 2
-            targetPos = targetPos + randomOffset
-        
-        elseif trackingMethod == "LagCompensated" then
-            -- 延迟补偿
-            local ping = 0.1  -- 假设100ms延迟
-            targetPos = targetPos + root.Velocity * ping
-        
-        elseif trackingMethod == "HeatSeeking" then
-            -- 热追踪 (忽略障碍)
-            -- 这里不需要额外处理，因为已经处理了穿墙
-        
-        elseif trackingMethod == "Bouncing" then
-            -- 弹跳追踪 (模拟弹道)
+            -- 默认直线追踪
             local direction = (targetPos - bullet.Position).Unit
-            local upVector = Vector3.new(0, 1, 0)
-            targetPos = targetPos + direction * 0.7 + upVector * 0.3
-        
-        elseif trackingMethod == "Teleporting" then
-            -- 瞬移追踪 (直接传送到目标)
-            bullet.CFrame = CFrame.new(targetPos)
+            bullet.CFrame = CFrame.new(bullet.Position, bullet.Position + direction)
             return true
         end
         
-        -- 默认直线追踪
-        local direction = (targetPos - bullet.Position).Unit
-        bullet.CFrame = CFrame.new(bullet.Position, bullet.Position + direction)
-        return true
-    end
-    
-    -- 显示目标信息
-    local function updateTargetInfo(target)
-        if not bulletTrackingEnabled or not showTargetInfo then
-            targetInfo.Visible = false
-            return
-        end
-        
-        if target then
-            targetInfo.Text = "目标: " .. target.Name
-            targetInfo.Visible = true
-        else
-            targetInfo.Visible = false
-        end
-    end
-    
-    -- 显示目标线条
-    local function updateTargetLine(target)
-        if not bulletTrackingEnabled or not showTargetLine then
-            targetLine.Visible = false
-            return
-        end
-        
-        local camera = workspace.CurrentCamera
-        if target and target.Character then
-            local root = target.Character:FindFirstChild("HumanoidRootPart")
-            if root then
-                local targetPos = root.Position
-                local screenPos = camera:WorldToViewportPoint(targetPos)
-                if screenPos.Z > 0 then
-                    local center = Vector2.new(camera.ViewportSize.X/2, camera.ViewportSize.Y/2)
-                    targetLine.From = center
-                    targetLine.To = Vector2.new(screenPos.X, screenPos.Y)
-                    targetLine.Visible = true
-                    return
-                end
-            end
-        end
-        targetLine.Visible = false
-    end
-    
-    -- 子弹追踪主循环
-    local trackingLoop
-    local function startBulletTracking()
-        if trackingLoop then return end
-        
-        trackingLoop = game:GetService("RunService").Heartbeat:Connect(function()
-            if not bulletTrackingEnabled then
-                updateTargetInfo(nil)
-                updateTargetLine(nil)
+        -- 显示目标信息
+        local function updateTargetInfo(target)
+            if not bulletTrackingEnabled or not showTargetInfo then
+                targetInfo.Visible = false
                 return
             end
             
-            local target = getTrackingTarget()
-            updateTargetInfo(target)
-            updateTargetLine(target)
-            
-            -- 实际追踪逻辑在武器开火时应用
-        end)
-    end
-    
-    local function stopBulletTracking()
-        if trackingLoop then
-            trackingLoop:Disconnect()
-            trackingLoop = nil
-        end
-        targetInfo.Visible = false
-        targetLine.Visible = false
-    end
-    
-    -- 监听武器开火事件
-    local function onWeaponFired(weapon, bullet)
-        if not bulletTrackingEnabled then return end
-        
-        local target = getTrackingTarget()
-        if not target or not target.Character then return end
-        
-        -- 应用追踪方法
-        local success = applyTrackingMethod(target.Character, bullet)
-        
-        -- 应用命中率
-        if not applyHitRate(success) then
-            -- 未命中，重置子弹方向
-            local camera = workspace.CurrentCamera
-            local direction = camera.CFrame.LookVector
-            bullet.CFrame = CFrame.new(bullet.Position, bullet.Position + direction)
-        end
-    end
-    
-    -- 检测武器系统
-    local function findWeaponSystem()
-        -- 尝试检测常见的武器系统
-        local character = game.Players.LocalPlayer.Character
-        if not character then return end
-        
-        -- 检测标准武器控制器
-        local tool = character:FindFirstChildOfClass("Tool")
-        if tool then
-            local remote = tool:FindFirstChild("FireServer", true)
-            if remote and remote:IsA("RemoteEvent") then
-                return tool, remote
-            end
-        end
-        
-        -- 检测模块化武器系统
-        local weaponsFolder = workspace:FindFirstChild("Weapons")
-        if weaponsFolder then
-            for _, weapon in ipairs(weaponsFolder:GetChildren()) do
-                if weapon:FindFirstChild("Fire") then
-                    return weapon, weapon.Fire
-                end
-            end
-        end
-        
-        return nil
-    end
-    
-    -- 初始化武器监听
-    local weaponHook
-    local function hookWeaponSystem()
-        if weaponHook then weaponHook:Disconnect() end
-        
-        local weapon, fireEvent = findWeaponSystem()
-        if not weapon then
-            OrionLib:MakeNotification({
-                Name = "武器系统",
-                Content = "未检测到武器系统，子弹追踪可能无效",
-                Time = 5
-            })
-            return
-        end
-        
-        weaponHook = fireEvent.OnClientEvent:Connect(function(bullet)
-            onWeaponFired(weapon, bullet)
-        end)
-        
-        OrionLib:MakeNotification({
-            Name = "武器系统",
-            Content = "已连接到武器系统: " .. weapon.Name,
-            Time = 3
-        })
-    end
-    
-    -- 角色变化时重新连接武器系统
-    game.Players.LocalPlayer.CharacterAdded:Connect(function()
-        task.wait(1)  -- 等待武器加载
-        hookWeaponSystem()
-    end)
-    
-    -----------------------------------------------------------------
-    -- 子弹追踪UI (添加到人物功能Tab)
-    -----------------------------------------------------------------
-    local bulletTrackingSec = Tab4:AddSection({Name = "子弹追踪系统"})
-    
-    -- 开关
-    bulletTrackingSec:AddToggle({
-        Name = "启用子弹追踪",
-        Default = false,
-        Callback = function(v)
-            bulletTrackingEnabled = v
-            if v then
-                startBulletTracking()
-                hookWeaponSystem()
+            if target then
+                targetInfo.Text = "目标: " .. target.Name
+                targetInfo.Visible = true
             else
-                stopBulletTracking()
-            end
-        end
-    })
-    
-    -- 追踪方法选择
-    bulletTrackingSec:AddDropdown({
-        Name = "追踪方法",
-        Default = trackingMethod,
-        Options = trackingMethods,
-        Callback = function(value)
-            trackingMethod = value
-        end
-    })
-    
-    -- 命中率调节
-    local hitRateSlider = bulletTrackingSec:AddSlider({
-        Name = "命中率 (%)",
-        Min = 0,
-        Max = 100,
-        Default = hitRate,
-        Increment = 1,
-        Callback = function(value)
-            hitRate = value
-        end
-    })
-    
-    bulletTrackingSec:AddTextbox({
-        Name = "命中率输入",
-        Default = tostring(hitRate),
-        Callback = function(txt)
-            local num = tonumber(txt)
-            if num then
-                num = math.clamp(num, 0, 100)
-                hitRate = num
-                hitRateSlider:Set(num)
-            end
-        end
-    })
-    
-    -- 穿墙开关
-    bulletTrackingSec:AddToggle({
-        Name = "子弹穿墙",
-        Default = wallPenetration,
-        Callback = function(v)
-            wallPenetration = v
-        end
-    })
-    
-    -- 显示目标信息开关
-    bulletTrackingSec:AddToggle({
-        Name = "显示目标信息",
-        Default = showTargetInfo,
-        Callback = function(v)
-            showTargetInfo = v
-            if not v then
                 targetInfo.Visible = false
             end
         end
-    })
-    
-    -- 瞄准方式选择
-    bulletTrackingSec:AddDropdown({
-        Name = "瞄准方式",
-        Default = aimMode,
-        Options = {"Distance", "Crosshair"},
-        Callback = function(value)
-            aimMode = value
-        end
-    })
-    
-    -- 显示目标线条开关
-    bulletTrackingSec:AddToggle({
-        Name = "显示目标线条",
-        Default = showTargetLine,
-        Callback = function(v)
-            showTargetLine = v
-            if not v then
+        
+        -- 显示目标线条
+        local function updateTargetLine(target)
+            if not bulletTrackingEnabled or not showTargetLine then
                 targetLine.Visible = false
+                return
+            end
+            
+            local camera = workspace.CurrentCamera
+            if target and target.Character then
+                local root = target.Character:FindFirstChild("HumanoidRootPart")
+                if root then
+                    local targetPos = root.Position
+                    local screenPos = camera:WorldToViewportPoint(targetPos)
+                    if screenPos.Z > 0 then
+                        local center = Vector2.new(camera.ViewportSize.X/2, camera.ViewportSize.Y/2)
+                        targetLine.From = center
+                        targetLine.To = Vector2.new(screenPos.X, screenPos.Y)
+                        targetLine.Visible = true
+                        return
+                    end
+                end
+            end
+            targetLine.Visible = false
+        end
+        
+        -- 子弹追踪主循环
+        local trackingLoop
+        local function startBulletTracking()
+            if trackingLoop then return end
+            
+            trackingLoop = game:GetService("RunService").Heartbeat:Connect(function()
+                if not bulletTrackingEnabled then
+                    updateTargetInfo(nil)
+                    updateTargetLine(nil)
+                    return
+                end
+                
+                local target = getTrackingTarget()
+                updateTargetInfo(target)
+                updateTargetLine(target)
+                
+                -- 实际追踪逻辑在武器开火时应用
+            end)
+        end
+        
+        local function stopBulletTracking()
+            if trackingLoop then
+                trackingLoop:Disconnect()
+                trackingLoop = nil
+            end
+            targetInfo.Visible = false
+            targetLine.Visible = false
+        end
+        
+        -- 监听武器开火事件
+        local function onWeaponFired(weapon, bullet)
+            if not bulletTrackingEnabled then return end
+            
+            local target = getTrackingTarget()
+            if not target or not target.Character then return end
+            
+            -- 应用追踪方法
+            local success = applyTrackingMethod(target.Character, bullet)
+            
+            -- 应用命中率
+            if not applyHitRate(success) then
+                -- 未命中，重置子弹方向
+                local camera = workspace.CurrentCamera
+                local direction = camera.CFrame.LookVector
+                bullet.CFrame = CFrame.new(bullet.Position, bullet.Position + direction)
             end
         end
-    })
-    
-    -- 最大距离设置
-    local distanceSlider = bulletTrackingSec:AddSlider({
-        Name = "最大距离 (米)",
-        Min = 10,
-        Max = 100000000,
-        Default = maxDistance,
-        Increment = 10,
-        Callback = function(value)
-            maxDistance = value
-        end
-    })
-    
-    bulletTrackingSec:AddTextbox({
-        Name = "最大距离输入",
-        Default = tostring(maxDistance),
-        Callback = function(txt)
-            local num = tonumber(txt)
-            if num then
-                num = math.clamp(num, 10, 100000000)
-                maxDistance = num
-                distanceSlider:Set(num)
+        
+        -- 检测武器系统
+        local function findWeaponSystem()
+            -- 尝试检测常见的武器系统
+            local character = game.Players.LocalPlayer.Character
+            if not character then return end
+            
+            -- 检测标准武器控制器
+            local tool = character:FindFirstChildOfClass("Tool")
+            if tool then
+                local remote = tool:FindFirstChild("FireServer", true)
+                if remote and remote:IsA("RemoteEvent") then
+                    return tool, remote
+                end
             end
+            
+            -- 检测模块化武器系统
+            local weaponsFolder = workspace:FindFirstChild("Weapons")
+            if weaponsFolder then
+                for _, weapon in ipairs(weaponsFolder:GetChildren()) do
+                    if weapon:FindFirstChild("Fire") then
+                        return weapon, weapon.Fire
+                    end
+                end
+            end
+            
+            return nil
         end
-    })
-    
-    -- 添加说明
-    bulletTrackingSec:AddParagraph("注意", "子弹追踪功能需要游戏中有可检测的武器系统")
-    
-    -- ... (其他代码保持不变) ...
-end)()
         
---VR脚本 Tap
-    local Tab2 = Window:MakeTab({Name = "VR", Icon = "rbxassetid://7733779610"})
-    Tab2:AddButton({Name = "FEVR脚本", Callback = function()
-        loadstring(game:HttpGet("https://raw.githubusercontent.com/randomstring0/Qwerty/refs/heads/main/qwerty45.lua"))()
-    end})
-
---控制台 Tap
-    local Tab3 = Window:MakeTab({Name = "控制台", Icon = "rbxassetid://7733779610"})
-    Tab3:AddButton({Name = "控制台脚本", Callback = function()
-        loadstring(game:HttpGet("https://raw.githubusercontent.com/yxgh165/yxgh165/main/666"))()
-    end})
-    
-    -- XA脚本 Tab
-    local TabXA = Window:MakeTab({Name = "XA脚本", Icon = "rbxassetid://7733779610"})
-    TabXA:AddButton({Name = "XA HUB", Callback = function()
-        loadstring(game:HttpGet("https://raw.gitcode.com/Xingtaiduan/Scripts/raw/main/Loader.lua"))()--join QQ group:1029830580
-    end})
-    
-    --RB脚本中心 Tap
-    local TabRB = Window:MakeTab({Name = "RB脚本", Icon = "rbxassetid://7733779610"})
-    TabRB:AddButton({Name = "Rb脚本", Callback = function()
-        loadstring(game:HttpGet("https://raw.githubusercontent.com/Yungengxin/roblox/refs/heads/main/Rb-Hub"))()
-    end})
-    
-    -- 生存与杀手 Tab
-    local Tab6 = Window:MakeTab({Name = "生存与杀手", Icon = "rbxassetid://7733779610"})
-    Tab6:AddButton({Name = "生存与杀手", Callback = function()
-        loadstring(game:HttpGet("https://raw.githubusercontent.com/Milan08Studio/ChairWare/main/main.lua"))()
-    end})
-    
-    --爱德华
-    local Tab7 = Window:MakeTab({Name = "爱德华", Icon = "rbxassetid://7733779610"})
-    Tab7:AddButton({Name = "爱德华", Callback = function()
-        loadstring(game:HttpGet("https://raw.githubusercontent.com/gumanba/Scripts/main/Edward"))()
-    end})
-    
-    --活了7天
-    local Tab8 = Window:MakeTab({Name = "活了7天", Icon = "rbxassetid://7733779610"})
-    Tab8:AddButton({Name = "活了7天", Callback = function()
-        loadstring(game:HttpGet("https://rawscripts.net/raw/Universal-Script-7-days-to-live-36824"))()
-    end})
-    
-    --死铁轨
-    local Tab9 = Window:MakeTab({Name = "死铁轨", Icon = "rbxassetid://7733979610"})
-    Tab9:AddButton({Name = "死铁轨", Callback = function()
-        loadstring(game:HttpGet("https://raw.githubusercontent.com/iopjklbnmsss/SansHubScript/refs/heads/main/SansHub"))()
-    end})
-
-    --一路向西刷钱
-    local Tab10 = Window:MakeTab({Name = "一路向西", Icon = "rbxassetid://7733979610"})
-    Tab10:AddButton({Name = "一路向西刷钱", Callback = function()
-
-loadstring(game:HttpGet("https://raw.githubusercontent.com/yxgh165/yxgh165/main/一路向西"))()
-    end})
+        -- 初始化武器监听
+        local weaponHook
+        local function hookWeaponSystem()
+            if weaponHook then weaponHook:Disconnect() end
+            
+            local weapon, fireEvent = findWeaponSystem()
+            if not weapon then
+                OrionLib:MakeNotification({
+                    Name = "武器系统",
+                    Content = "未检测到武器系统，子弹追踪可能无效",
+                    Time = 5
+                })
+                return
+            end
+            
+            weaponHook = fireEvent.OnClientEvent:Connect(function(bullet)
+                onWeaponFired(weapon, bullet)
+            end)
+            
+            OrionLib:MakeNotification({
+                Name = "武器系统",
+                Content = "已连接到武器系统: " .. weapon.Name,
+                Time = 3
+            })
+        end
         
---自然灾害
-    local Tab11 = Window:MakeTab({Name = "自然灾害", Icon = "rbxassetid://7733979610"})
-    Tab11:AddButton({Name = "自然灾害黑洞v6", Callback = function()
- 
-loadstring(game:HttpGet("https://rawscripts.net/raw/Universal-Script-Super-ring-Parts-V6-28581"))()
-    end})
+        -- 角色变化时重新连接武器系统
+        game.Players.LocalPlayer.CharacterAdded:Connect(function()
+            task.wait(1)  -- 等待武器加载
+            hookWeaponSystem()
+        end)
+        
+        -----------------------------------------------------------------
+        -- 子弹追踪UI (添加到人物功能Tab)
+        -----------------------------------------------------------------
+        local bulletTrackingSec = Tab4:AddSection({Name = "子弹追踪系统"})
+        
+        -- 开关
+        bulletTrackingSec:AddToggle({
+            Name = "启用子弹追踪",
+            Default = false,
+            Callback = function(v)
+                bulletTrackingEnabled = v
+                if v then
+                    startBulletTracking()
+                    hookWeaponSystem()
+                else
+                    stopBulletTracking()
+                end
+            end
+        })
+        
+        -- 追踪方法选择
+        bulletTrackingSec:AddDropdown({
+            Name = "追踪方法",
+            Default = trackingMethod,
+            Options = trackingMethods,
+            Callback = function(value)
+                trackingMethod = value
+            end
+        })
+        
+        -- 命中率调节
+        local hitRateSlider = bulletTrackingSec:AddSlider({
+            Name = "命中率 (%)",
+            Min = 0,
+            Max = 100,
+            Default = hitRate,
+            Increment = 1,
+            Callback = function(value)
+                hitRate = value
+            end
+        })
+        
+        bulletTrackingSec:AddTextbox({
+            Name = "命中率输入",
+            Default = tostring(hitRate),
+            Callback = function(txt)
+                local num = tonumber(txt)
+                if num then
+                    num = math.clamp(num, 0, 100)
+                    hitRate = num
+                    hitRateSlider:Set(num)
+                end
+            end
+        })
+        
+        -- 穿墙开关
+        bulletTrackingSec:AddToggle({
+            Name = "子弹穿墙",
+            Default = wallPenetration,
+            Callback = function(v)
+                wallPenetration = v
+            end
+        })
+        
+        -- 显示目标信息开关
+        bulletTrackingSec:AddToggle({
+            Name = "显示目标信息",
+            Default = showTargetInfo,
+            Callback = function(v)
+                showTargetInfo = v
+                if not v then
+                    targetInfo.Visible = false
+                end
+            end
+        })
+        
+        -- 瞄准方式选择
+        bulletTrackingSec:AddDropdown({
+            Name = "瞄准方式",
+            Default = aimMode,
+            Options = {"Distance", "Crosshair"},
+            Callback = function(value)
+                aimMode = value
+            end
+        })
+        
+        -- 显示目标线条开关
+        bulletTrackingSec:AddToggle({
+            Name = "显示目标线条",
+            Default = showTargetLine,
+            Callback = function(v)
+                showTargetLine = v
+                if not v then
+                    targetLine.Visible = false
+                end
+            end
+        })
+        
+        -- 最大距离设置
+        local distanceSlider = bulletTrackingSec:AddSlider({
+            Name = "最大距离 (米)",
+            Min = 10,
+            Max = 100000000,
+            Default = maxDistance,
+            Increment = 10,
+            Callback = function(value)
+                maxDistance = value
+            end
+        })
+        
+        bulletTrackingSec:AddTextbox({
+            Name = "最大距离输入",
+            Default = tostring(maxDistance),
+            Callback = function(txt)
+                local num = tonumber(txt)
+                if num then
+                    num = math.clamp(num, 10, 100000000)
+                    maxDistance = num
+                    distanceSlider:Set(num)
+                end
+            end
+        })
+        
+        -- 添加说明
+        bulletTrackingSec:AddParagraph("注意", "子弹追踪功能需要游戏中有可检测的武器系统")
+        
+        -- ... (其他代码保持不变) ...
+        
+        --VR脚本 Tap
+            local Tab2 = Window:MakeTab({Name = "VR", Icon = "rbxassetid://7733779610"})
+            Tab2:AddButton({Name = "FEVR脚本", Callback = function()
+                loadstring(game:HttpGet("https://raw.githubusercontent.com/randomstring0/Qwerty/refs/heads/main/qwerty45.lua"))()
+            end})
 
-        -- 设置Tab - 卡密管理
-        local SettingsTab = Window:MakeTab({Name = "设置", Icon = "rbxassetid://7733779610"})
-        SettingsTab:AddButton({
-            Name = "清除卡密",
-            Callback = function()
+        --控制台 Tap
+            local Tab3 = Window:MakeTab({Name = "控制台", Icon = "rbxassetid://7733779610"})
+            Tab3:AddButton({Name = "控制台脚本", Callback = function()
+                loadstring(game:HttpGet("https://raw.githubusercontent.com/yxgh165/yxgh165/main/666"))()
+            end})
+            
+            -- XA脚本 Tab
+            local Tab4 = Window:MakeTab({Name = "XA脚本", Icon = "rbxassetid://7733779610"})
+            Tab4:AddButton({Name = "XA HUB", Callback = function()
+                loadstring(game:HttpGet("https://raw.gitcode.com/Xingtaiduan/Scripts/raw/main/Loader.lua"))()--join QQ group:1029830580
+            end})
+            
+            --RB脚本中心 Tap
+            local Tab5 = Window:MakeTab({Name = "RB脚本", Icon = "rbxassetid://7733779610"})
+            Tab5:AddButton({Name = "Rb脚本", Callback = function()
+                loadstring(game:HttpGet("https://raw.githubusercontent.com/Yungengxin/roblox/refs/heads/main/Rb-Hub"))()
+            end})
+            
+            -- 生存与杀手 Tab
+            local Tab6 = Window:MakeTab({Name = "生存与杀手", Icon = "rbxassetid://7733779610"})
+            Tab6:AddButton({Name = "生存与杀手", Callback = function()
+                loadstring(game:HttpGet("https://raw.githubusercontent.com/Milan08Studio/ChairWare/main/main.lua"))()
+            end})
+            
+            --爱德华
+            local Tab7 = Window:MakeTab({Name = "爱德华", Icon = "rbxassetid://7733779610"})
+            Tab7:AddButton({Name = "爱德华", Callback = function()
+                loadstring(game:HttpGet("https://raw.githubusercontent.com/gumanba/Scripts/main/Edward"))()
+            end})
+            
+            --活了7天
+            local Tab8 = Window:MakeTab({Name = "活了7天", Icon = "rbxassetid://7733779610"})
+            Tab8:AddButton({Name = "活了7天", Callback = function()
+                loadstring(game:HttpGet("https://rawscripts.net/raw/Universal-Script-7-days-to-live-36824"))()
+            end})
+            
+            --死铁轨
+            local Tab9 = Window:MakeTab({Name = "死铁轨", Icon = "rbxassetid://7733979610"})
+            Tab9:AddButton({Name = "死铁轨", Callback = function()
+                loadstring(game:HttpGet("https://raw.githubusercontent.com/iopjklbnmsss/SansHubScript/refs/heads/main/SansHub"))()
+            end})
+
+            --一路向西刷钱
+            local Tab10 = Window:MakeTab({Name = "一路向西", Icon = "rbxassetid://7733979610"})
+            Tab10:AddButton({Name = "一路向西刷钱", Callback = function()
+
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/yxgh165/yxgh165/main/一路向西"))()
+            end})
+                
+        --自然灾害
+            local Tab11 = Window:MakeTab({Name = "自然灾害", Icon = "rbxassetid://7733979610"})
+            Tab11:AddButton({Name = "自然灾害黑洞v6", Callback = function()
+         
+        loadstring(game:HttpGet("https://rawscripts.net/raw/Universal-Script-Super-ring-Parts-V6-28581"))()
+            end})
+
+                -- 设置Tab - 卡密管理
+                local SettingsTab = Window:MakeTab({Name = "设置", Icon = "rbxassetid://7733779610"})
+                SettingsTab:AddButton({
+                    Name = "清除卡密",
+                    Callback = function()
+                        if isfile and isfile(KeySystem.KeyFile) then
+                            delfile(KeySystem.KeyFile)
+                            OrionLib:MakeNotification({
+                                Name = "成功",
+                                Content = "卡密已清除，请重新验证",
+                                Time = 3
+                            })
+                            Window:Destroy()
+                            wait(1)
+                            ShowKeyWindow()
+                        end
+                    end
+                })
+                
+                SettingsTab:AddLabel("卡密状态: " .. (KeySystem.CurrentKey and "已验证" or "未验证"))
+                SettingsTab:AddLabel("当前卡密: " .. (KeySystem.CurrentKey or "无"))
+                
+                -- 添加一键复制卡密按钮
+                SettingsTab:AddButton({
+                    Name = "一键复制当前卡密",
+                    Callback = function()
+                        if KeySystem.CurrentKey and KeySystem.CurrentKey ~= "" then
+                            local success = CopyToClipboard(KeySystem.CurrentKey)
+                            ShowCopyNotification(success, KeySystem.CurrentKey)
+                        else
+                            OrionLib:MakeNotification({
+                                Name = "复制失败",
+                                Content = "当前没有卡密可复制",
+                                Time = 3
+                            })
+                        end
+                    end
+                })
+                
+                -- 添加一键复制Discord链接按钮
+                SettingsTab:AddButton({
+                    Name = "一键复制Discord链接",
+                    Callback = function()
+                        local discordLink = "https://discord.gg/xVUf7H9M"
+                        local success = CopyToClipboard(discordLink)
+                        ShowCopyNotification(success, discordLink)
+                    end
+                })
+                
+                -- 启动
+                OrionLib:Init()
+            end
+            
+            -- 主逻辑：检查是否有已验证的卡密
+            local savedKey = LoadKey()
+            if savedKey and VerifyKey(savedKey) then
+                KeySystem.CurrentKey = savedKey
+                KeySystem.IsVerified = true
+                
+                -- 创建坤坤大帝脚本动画
+                CreateKunKunAnimation()
+                
+                -- 延迟后显示主窗口
+                wait(2.5)
+                ShowMainWindow()
+            else
+                -- 清除无效的已保存卡密
                 if isfile and isfile(KeySystem.KeyFile) then
                     delfile(KeySystem.KeyFile)
+                end
+                ShowKeyWindow()
+            end
+            
+            -- 忍者注入器兼容性检查
+            if identifyexecutor and identifyexecutor():lower():find("ninja") then
+                OrionLib:MakeNotification({
+                    Name = "注入器检测",
+                    Content = "忍者注入器已识别，所有功能兼容",
+                    Time = 3
+                })
+            end
+            
+            -- 添加卡密管理命令（可选）
+            getgenv().SetKey = function(key)
+                if VerifyKey(key) then
+                    KeySystem.CurrentKey = key
+                    KeySystem.IsVerified = true
+                    SaveKey(key)
                     OrionLib:MakeNotification({
                         Name = "成功",
-                        Content = "卡密已清除，请重新验证",
-                        Time = 3
+                        Content = "卡密已通过命令设置",
+                        Time = 2
                     })
-                    Window:Destroy()
-                    wait(1)
-                    ShowKeyWindow()
-                end
-            end
-        })
-        
-        SettingsTab:AddLabel("卡密状态: " .. (KeySystem.CurrentKey and "已验证" or "未验证"))
-        SettingsTab:AddLabel("当前卡密: " .. (KeySystem.CurrentKey or "无"))
-        
-        -- 添加一键复制卡密按钮
-        SettingsTab:AddButton({
-            Name = "一键复制当前卡密",
-            Callback = function()
-                if KeySystem.CurrentKey and KeySystem.CurrentKey ~= "" then
-                    local success = CopyToClipboard(KeySystem.CurrentKey)
-                    ShowCopyNotification(success, KeySystem.CurrentKey)
                 else
                     OrionLib:MakeNotification({
-                        Name = "复制失败",
-                        Content = "当前没有卡密可复制",
-                        Time = 3
+                        Name = "失败",
+                        Content = "无效的卡密",
+                        Time = 2
                     })
                 end
             end
-        })
-        
-        -- 添加一键复制Discord链接按钮
-        SettingsTab:AddButton({
-            Name = "一键复制Discord链接",
-            Callback = function()
-                local discordLink = "https://discord.gg/xVUf7H9M"
-                local success = CopyToClipboard(discordLink)
-                ShowCopyNotification(success, discordLink)
+            
+            getgenv().ClearKey = function()
+                if isfile and isfile(KeySystem.KeyFile) then
+                    delfile(KeySystem.KeyFile)
+                    KeySystem.IsVerified = false
+                    OrionLib:MakeNotification({
+                        Name = "成功",
+                        Content = "卡密已清除",
+                        Time = 2
+                    })
+                end
             end
+    end)
+    
+    if not success then
+        warn("[脚本错误] " .. tostring(err))
+        game:GetService("StarterGui"):SetCore("SendNotification", {
+            Title = "脚本加载失败",
+            Text = "错误: " .. tostring(err),
+            Duration = 10
         })
-        
-        -- 启动
-        OrionLib:Init()
-    end
-    
-    -- 主逻辑：检查是否有已验证的卡密
-    local savedKey = LoadKey()
-    if savedKey and VerifyKey(savedKey) then
-        KeySystem.CurrentKey = savedKey
-        KeySystem.IsVerified = true
-        
-        -- 创建坤坤大帝脚本动画
-        CreateKunKunAnimation()
-        
-        -- 延迟后显示主窗口
-        wait(2.5)
-        ShowMainWindow()
-    else
-        -- 清除无效的已保存卡密
-        if isfile and isfile(KeySystem.KeyFile) then
-            delfile(KeySystem.KeyFile)
-        end
-        ShowKeyWindow()
-    end
-    
-    -- 忍者注入器兼容性检查
-    if identifyexecutor and identifyexecutor():lower():find("ninja") then
-        OrionLib:MakeNotification({
-            Name = "注入器检测",
-            Content = "忍者注入器已识别，所有功能兼容",
-            Time = 3
-        })
-    end
-    
-    -- 添加卡密管理命令（可选）
-    getgenv().SetKey = function(key)
-        if VerifyKey(key) then
-            KeySystem.CurrentKey = key
-            KeySystem.IsVerified = true
-            SaveKey(key)
-            OrionLib:MakeNotification({
-                Name = "成功",
-                Content = "卡密已通过命令设置",
-                Time = 2
-            })
-        else
-            OrionLib:MakeNotification({
-                Name = "失败",
-                Content = "无效的卡密",
-                Time = 2
-            })
-        end
-    end
-    
-    getgenv().ClearKey = function()
-        if isfile and isfile(KeySystem.KeyFile) then
-            delfile(KeySystem.KeyFile)
-            KeySystem.IsVerified = false
-            OrionLib:MakeNotification({
-                Name = "成功",
-                Content = "卡密已清除",
-                Time = 2
-            })
-        end
     end
 end)()
