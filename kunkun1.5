@@ -330,7 +330,7 @@ local function ShowMainWindow()
     })
     
     -- 人物功能 Tab
-    local Tab4 = Window:CreateTab("人物功能", 7733779610)
+    local Tab2 = Window:CreateTab("人物功能", 7733779610)
     
     -- 兼容 executor 没有 mouse1press / mouse1release
     local mouse1press  = mouse1press  or function()
@@ -397,6 +397,8 @@ local function ShowMainWindow()
     local function setFixedCenter()
         local center = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
         fixedFovCircle.Position = center
+        -- 初始化自瞄线条的起点
+        aimLine.From = center
     end
     Camera:GetPropertyChangedSignal("ViewportSize"):Connect(setFixedCenter)
     setFixedCenter()
@@ -559,10 +561,12 @@ local function ShowMainWindow()
     end
     
     -----------------------------------------------------------------
-    -- UI 构建（增强版）
+    -- AI-Aimbot 独立标签页
     -----------------------------------------------------------------
-    Tab4:CreateSection("AI-Aimbot")
-    Tab4:CreateToggle({
+    local Tab3 = Window:CreateTab("AI-Aimbot", 7733961748) -- 使用不同的图标
+    
+    Tab3:CreateSection("AI-Aimbot")
+    Tab3:CreateToggle({
         Name = "启用 Aimbot",
         CurrentValue = false,
         Callback = function(v)
@@ -575,39 +579,39 @@ local function ShowMainWindow()
         end
     })
     
-    Tab4:CreateToggle({
+    Tab3:CreateToggle({
         Name = "仅瞄准敌人",
         CurrentValue = aimbotCheckTeam,
         Callback = function(v) aimbotCheckTeam = v end
     })
     
-    Tab4:CreateToggle({
+    Tab3:CreateToggle({
         Name = "墙体检测",
         CurrentValue = wallCheckEnabled,
         Callback = function(v) wallCheckEnabled = v end
     })
     
-    Tab4:CreateToggle({
+    Tab3:CreateToggle({
         Name = "显示自瞄线条",
         CurrentValue = aimLineEnabled,
         Callback = function(v) aimLineEnabled = v end
     })
     
-    Tab4:CreateDropdown({
+    Tab3:CreateDropdown({
         Name = "瞄准方式",
         Options = {"Distance", "Crosshair"},
         CurrentOption = aimbotMode,
         Callback = function(v) aimbotMode = v end
     })
     
-    Tab4:CreateSection("跟随鼠标 FOV")
-    Tab4:CreateToggle({ 
+    Tab3:CreateSection("跟随鼠标 FOV")
+    Tab3:CreateToggle({ 
         Name = "显示跟随FOV", 
         CurrentValue = false, 
         Callback = function(v) mouseFovCircle.Visible = v end 
     })
     
-    Tab4:CreateSlider({
+    Tab3:CreateSlider({
         Name = "半径（滑条）",
         Range = {0, 500},
         Increment = 5,
@@ -619,7 +623,7 @@ local function ShowMainWindow()
         end
     })
     
-    Tab4:CreateInput({
+    Tab3:CreateInput({
         Name = "半径（输入）",
         PlaceholderText = tostring(mouseFOV),
         RemoveTextAfterFocusLost = false,
@@ -632,14 +636,14 @@ local function ShowMainWindow()
         end
     })
     
-    Tab4:CreateSection("固定中心 FOV")
-    Tab4:CreateToggle({ 
+    Tab3:CreateSection("固定中心 FOV")
+    Tab3:CreateToggle({ 
         Name = "显示固定FOV", 
         CurrentValue = false, 
         Callback = function(v) fixedFovCircle.Visible = v end 
     })
     
-    Tab4:CreateSlider({
+    Tab3:CreateSlider({
         Name = "半径（滑条）",
         Range = {0, 500},
         Increment = 5,
@@ -651,7 +655,7 @@ local function ShowMainWindow()
         end
     })
     
-    Tab4:CreateInput({
+    Tab3:CreateInput({
         Name = "半径（输入）",
         PlaceholderText = tostring(fixedFOV),
         RemoveTextAfterFocusLost = false,
@@ -664,8 +668,8 @@ local function ShowMainWindow()
         end
     })
     
-    Tab4:CreateSection("通用参数")
-    Tab4:CreateSlider({
+    Tab3:CreateSection("通用参数")
+    Tab3:CreateSlider({
         Name = "平滑系数（滑条）",
         Range = {0, 1},
         Increment = 0.01,
@@ -674,7 +678,7 @@ local function ShowMainWindow()
         Callback = function(v) aimbotSmooth = v end
     })
     
-    Tab4:CreateInput({
+    Tab3:CreateInput({
         Name = "平滑系数（输入）",
         PlaceholderText = tostring(aimbotSmooth),
         RemoveTextAfterFocusLost = false,
@@ -686,7 +690,7 @@ local function ShowMainWindow()
         end
     })
     
-    Tab4:CreateSlider({
+    Tab3:CreateSlider({
         Name = "预测 (秒)（滑条）",
         Range = {0, 1},
         Increment = 0.01,
@@ -695,7 +699,7 @@ local function ShowMainWindow()
         Callback = function(v) aimbotPrediction = v end
     })
     
-    Tab4:CreateInput({
+    Tab3:CreateInput({
         Name = "预测 (秒)（输入）",
         PlaceholderText = tostring(aimbotPrediction),
         RemoveTextAfterFocusLost = false,
@@ -707,7 +711,7 @@ local function ShowMainWindow()
         end
     })
     
-    Tab4:CreateSlider({
+    Tab3:CreateSlider({
         Name = "开火延迟 (秒)（滑条）",
         Range = {0, 1},
         Increment = 0.01,
@@ -716,7 +720,7 @@ local function ShowMainWindow()
         Callback = function(v) aimbotDelay = v end
     })
     
-    Tab4:CreateInput({
+    Tab3:CreateInput({
         Name = "开火延迟 (秒)（输入）",
         PlaceholderText = tostring(aimbotDelay),
         RemoveTextAfterFocusLost = false,
@@ -728,7 +732,7 @@ local function ShowMainWindow()
         end
     })
     
-    Tab4:CreateDropdown({
+    Tab3:CreateDropdown({
         Name = "瞄准骨骼",
         Options = {"Head","Neck","UpperTorso","HumanoidRootPart"},
         CurrentOption = aimbotBone,
@@ -738,7 +742,7 @@ local function ShowMainWindow()
     -----------------------------------------------------------------
     -- 删除阴影（全局开关）
     -----------------------------------------------------------------
-    Tab4:CreateToggle({
+    Tab2:CreateToggle({
         Name = "删除阴影",
         CurrentValue = false,
         Callback = function(v)
@@ -943,9 +947,9 @@ local function ShowMainWindow()
         stopFlying()
     end)
     
-    Tab4:CreateSection("飞行功能")
+    Tab2:CreateSection("飞行功能")
     
-    Tab4:CreateToggle({
+    Tab2:CreateToggle({
         Name = "启用飞行",
         CurrentValue = false,
         Callback = function(v)
@@ -958,7 +962,7 @@ local function ShowMainWindow()
         end
     })
     
-    Tab4:CreateSlider({
+    Tab2:CreateSlider({
         Name = "飞行速度",
         Range = {10, 200},
         Increment = 5,
@@ -977,10 +981,10 @@ local function ShowMainWindow()
         end
     })
     
-    Tab4:CreateLabel("控制方式:")
-    Tab4:CreateLabel("W/A/S/D - 前后左右移动")
-    Tab4:CreateLabel("空格键 - 向上飞行")
-    Tab4:CreateLabel("Ctrl键 - 向下飞行")
+    Tab2:CreateLabel("控制方式:")
+    Tab2:CreateLabel("W/A/S/D - 前后左右移动")
+    Tab2:CreateLabel("空格键 - 向上飞行")
+    Tab2:CreateLabel("Ctrl键 - 向下飞行")
     
     -----------------------------------------------------------------
     -- 增强版玩家 ESP（含队伍检测、距离、血条和线条绘制）
@@ -1161,47 +1165,6 @@ local function ShowMainWindow()
     end
 
     local espLoop
-    Tab4:CreateSection("玩家透视")
-    Tab4:CreateToggle({
-        Name = "增强玩家 ESP", 
-        CurrentValue = false, 
-        Callback = function(v)
-            espEnabled = v
-            if v then
-                if not espLoop then
-                    espLoop = game:GetService("RunService").RenderStepped:Connect(updateESP)
-                end
-            else
-                if espLoop then
-                    espLoop:Disconnect()
-                    espLoop = nil
-                end
-                for plr, esp in pairs(espCache) do
-                    for _, obj in pairs(esp) do
-                        pcall(function() obj:Remove() end)
-                    end
-                end
-                table.clear(espCache)
-            end
-        end
-    })
-
-    Tab4:CreateDropdown({
-        Name = "线条位置",
-        Options = {"Top", "Bottom"},
-        CurrentOption = tracerPosition,
-        Callback = function(value)
-            tracerPosition = value
-        end
-    })
-
-    Tab4:CreateToggle({
-        Name = "只显示敌人",
-        CurrentValue = espShowEnemyOnly,
-        Callback = function(v)
-            espShowEnemyOnly = v
-        end
-    })
     
     -----------------------------------------------------------------
     -- NPC 透视（增强版）
@@ -1302,6 +1265,55 @@ local function ShowMainWindow()
     end
     
     local npcEspLoop
+    
+    -----------------------------------------------------------------
+    -- 透视功能独立标签页
+    -----------------------------------------------------------------
+    local Tab4 = Window:CreateTab("透视功能", 7733961749) -- 使用不同的图标
+    
+    Tab4:CreateSection("玩家透视")
+    Tab4:CreateToggle({
+        Name = "增强玩家 ESP", 
+        CurrentValue = false, 
+        Callback = function(v)
+            espEnabled = v
+            if v then
+                if not espLoop then
+                    espLoop = game:GetService("RunService").RenderStepped:Connect(updateESP)
+                end
+            else
+                if espLoop then
+                    espLoop:Disconnect()
+                    espLoop = nil
+                end
+                for plr, esp in pairs(espCache) do
+                    for _, obj in pairs(esp) do
+                        pcall(function() obj:Remove() end)
+                    end
+                end
+                table.clear(espCache)
+            end
+        end
+    })
+
+    Tab4:CreateDropdown({
+        Name = "线条位置",
+        Options = {"Top", "Bottom"},
+        CurrentOption = tracerPosition,
+        Callback = function(value)
+            tracerPosition = value
+        end
+    })
+
+    Tab4:CreateToggle({
+        Name = "只显示敌人",
+        CurrentValue = espShowEnemyOnly,
+        Callback = function(v)
+            espShowEnemyOnly = v
+        end
+    })
+    
+    Tab4:CreateSection("NPC透视")
     Tab4:CreateToggle({
         Name = "增强NPC透视", 
         CurrentValue = false, 
@@ -1349,8 +1361,8 @@ local function ShowMainWindow()
         applyValues()
     end)
     
-    Tab4:CreateSection("三锁定")
-    Tab4:CreateInput({
+    Tab2:CreateSection("三锁定")
+    Tab2:CreateInput({
         Name = "设定移速（仅保存值）", 
         PlaceholderText = tostring(savedSpeed),
         RemoveTextAfterFocusLost = false,
@@ -1360,7 +1372,7 @@ local function ShowMainWindow()
         end
     })
     
-    Tab4:CreateInput({
+    Tab2:CreateInput({
         Name = "设定跳跃高度（仅保存值）", 
         PlaceholderText = tostring(savedJump),
         RemoveTextAfterFocusLost = false,
@@ -1370,7 +1382,7 @@ local function ShowMainWindow()
         end
     })
     
-    Tab4:CreateInput({
+    Tab2:CreateInput({
         Name = "设定重力值（仅保存值）", 
         PlaceholderText = tostring(savedGrav),
         RemoveTextAfterFocusLost = false,
@@ -1380,7 +1392,7 @@ local function ShowMainWindow()
         end
     })
     
-    Tab4:CreateToggle({
+    Tab2:CreateToggle({
         Name = "锁定移速", 
         CurrentValue = false, 
         Callback = function(v) 
@@ -1389,7 +1401,7 @@ local function ShowMainWindow()
         end
     })
     
-    Tab4:CreateToggle({
+    Tab2:CreateToggle({
         Name = "锁定跳跃", 
         CurrentValue = false, 
         Callback = function(v) 
@@ -1398,7 +1410,7 @@ local function ShowMainWindow()
         end
     })
     
-    Tab4:CreateToggle({
+    Tab2:CreateToggle({
         Name = "锁定重力", 
         CurrentValue = false, 
         Callback = function(v) 
@@ -1408,68 +1420,68 @@ local function ShowMainWindow()
     })
     
     -- VR脚本 Tab
-    local Tab2 = Window:CreateTab("VR", 7733779610)
-    Tab2:CreateButton({Name = "FEVR脚本", Callback = function()
+    local Tab5 = Window:CreateTab("VR", 7733779610)
+    Tab5:CreateButton({Name = "FEVR脚本", Callback = function()
         loadstring(game:HttpGet("https://raw.githubusercontent.com/randomstring0/Qwerty/refs/heads/main/qwerty45.lua"))()
     end})
 
     -- 控制台 Tab
-    local Tab3 = Window:CreateTab("控制台", 7733779610)
-    Tab3:CreateButton({Name = "控制台脚本", Callback = function()
+    local Tab6 = Window:CreateTab("控制台", 7733779610)
+    Tab6:CreateButton({Name = "控制台脚本", Callback = function()
         loadstring(game:HttpGet("https://raw.githubusercontent.com/yxgh165/yxgh165/main/666"))()
     end})
     
     -- XA脚本 Tab
-    local Tab5 = Window:CreateTab("XA脚本", 7733779610)
-    Tab5:CreateButton({Name = "XA HUB", Callback = function()
+    local Tab7 = Window:CreateTab("XA脚本", 7733779610)
+    Tab7:CreateButton({Name = "XA HUB", Callback = function()
         loadstring(game:HttpGet("https://raw.gitcode.com/Xingtaiduan/Scripts/raw/main/Loader.lua"))()
     end})
     
     -- RB脚本中心 Tab
-    local Tab6 = Window:CreateTab("RB脚本", 7733779610)
-    Tab6:CreateButton({Name = "Rb脚本", Callback = function()
+    local Tab8 = Window:CreateTab("RB脚本", 7733779610)
+    Tab8:CreateButton({Name = "Rb脚本", Callback = function()
         loadstring(game:HttpGet("https://raw.githubusercontent.com/Yungengxin/roblox/refs/heads/main/Rb-Hub"))()
     end})
     
     -- 生存与杀手 Tab
-    local Tab7 = Window:CreateTab("生存与杀手", 7733779610)
-    Tab7:CreateButton({Name = "生存与杀手", Callback = function()
+    local Tab9 = Window:CreateTab("生存与杀手", 7733779610)
+    Tab9:CreateButton({Name = "生存与杀手", Callback = function()
         loadstring(game:HttpGet("https://raw.githubusercontent.com/Milan08Studio/ChairWare/main/main.lua"))()
     end})
     
     -- 爱德华 Tab
-    local Tab8 = Window:CreateTab("爱德华", 7733779610)
-    Tab8:CreateButton({Name = "爱德华", Callback = function()
+    local Tab10 = Window:CreateTab("爱德华", 7733779610)
+    Tab10:CreateButton({Name = "爱德华", Callback = function()
         loadstring(game:HttpGet("https://raw.githubusercontent.com/gumanba/Scripts/main/Edward"))()
     end})
     
     -- 活了7天 Tab
-    local Tab9 = Window:CreateTab("活了7天", 7733779610)
-    Tab9:CreateButton({Name = "活了7天", Callback = function()
+    local Tab11 = Window:CreateTab("活了7天", 7733779610)
+    Tab11:CreateButton({Name = "活了7天", Callback = function()
         loadstring(game:HttpGet("https://rawscripts.net/raw/Universal-Script-7-days-to-live-36824"))()
     end})
     
     -- 死铁轨 Tab
-    local Tab10 = Window:CreateTab("死铁轨", 7733979610)
-    Tab10:CreateButton({Name = "死铁轨", Callback = function()
+    local Tab12 = Window:CreateTab("死铁轨", 7733979610)
+    Tab12:CreateButton({Name = "死铁轨", Callback = function()
         loadstring(game:HttpGet("https://raw.githubusercontent.com/iopjklbnmsss/SansHubScript/refs/heads/main/SansHub"))()
     end})
 
     -- 一路向西刷钱 Tab
-    local Tab11 = Window:CreateTab("一路向西", 7733979610)
-    Tab11:CreateButton({Name = "一路向西刷钱", Callback = function()
+    local Tab13 = Window:CreateTab("一路向西", 7733979610)
+    Tab13:CreateButton({Name = "一路向西刷钱", Callback = function()
         loadstring(game:HttpGet("https://raw.githubusercontent.com/yxgh165/yxgh165/main/一路向西"))()
     end})
         
     -- 自然灾害 Tab
-    local Tab12 = Window:CreateTab("自然灾害", 7733979610)
-    Tab12:CreateButton({Name = "自然灾害黑洞v6", Callback = function()
+    local Tab14 = Window:CreateTab("自然灾害", 7733979610)
+    Tab14:CreateButton({Name = "自然灾害黑洞v6", Callback = function()
         loadstring(game:HttpGet("https://rawscripts.net/raw/Universal-Script-Super-ring-Parts-V6-28581"))()
     end})
 
     -- 设置Tab - 卡密管理
-    local SettingsTab = Window:CreateTab("设置", 7733779610)
-    SettingsTab:CreateButton({
+    local Tab15 = Window:CreateTab("设置", 7733779610)
+    Tab15:CreateButton({
         Name = "清除卡密",
         Callback = function()
             if isfile and isfile(KeySystem.KeyFile) then
@@ -1487,10 +1499,10 @@ local function ShowMainWindow()
         end
     })
     
-    SettingsTab:CreateLabel("卡密状态: " .. (KeySystem.CurrentKey and "已验证" or "未验证"))
-    SettingsTab:CreateLabel("当前卡密: " .. (KeySystem.CurrentKey or "无"))
+    Tab15:CreateLabel("卡密状态: " .. (KeySystem.CurrentKey and "已验证" or "未验证"))
+    Tab15:CreateLabel("当前卡密: " .. (KeySystem.CurrentKey or "无"))
     
-    SettingsTab:CreateButton({
+    Tab15:CreateButton({
         Name = "一键复制当前卡密",
         Callback = function()
             if KeySystem.CurrentKey and KeySystem.CurrentKey ~= "" then
@@ -1507,7 +1519,7 @@ local function ShowMainWindow()
         end
     })
     
-    SettingsTab:CreateButton({
+    Tab15:CreateButton({
         Name = "一键复制Discord链接",
         Callback = function()
             local discordLink = "https://discord.gg/xVUf7H9M"
