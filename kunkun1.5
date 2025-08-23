@@ -69,8 +69,8 @@ local function CreateKunKunAnimation()
     local function elasticAnimation(obj, targetY, duration)
         local startY = obj.Position.Y
         local startTime = tick()
-        local damping = 0.1
-        local stiffness = 0.1
+        local damping = 0.7
+        local stiffness = 0.3
         
         local connection
         connection = game:GetService("RunService").RenderStepped:Connect(function()
@@ -101,7 +101,7 @@ local function CreateKunKunAnimation()
         wait(0.2)
         elasticAnimation(subText, workspace.CurrentCamera.ViewportSize.Y/2 + 20, 1.3)
         
-        wait(3.5)
+        wait(2.0)
         
         for i = 0, 1, 0.05 do
             text.Transparency = i
