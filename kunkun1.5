@@ -69,8 +69,8 @@ local function CreateKunKunAnimation()
     local function elasticAnimation(obj, targetY, duration)
         local startY = obj.Position.Y
         local startTime = tick()
-        local damping = 0.7
-        local stiffness = 0.3
+        local damping = 0.1
+        local stiffness = 0.1
         
         local connection
         connection = game:GetService("RunService").RenderStepped:Connect(function()
