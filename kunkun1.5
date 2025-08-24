@@ -1,4 +1,4 @@
-local Rayfield = loadstring(game:HttpGet('loadstring(game:HttpGet("https://raw.githubusercontent.com/yxgh165/yxgh165/main/Rayfield kayuan"))()
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 -- 使用 Rayfield 内置密钥系统
 local Window = Rayfield:CreateWindow({
@@ -19,7 +19,7 @@ local Window = Rayfield:CreateWindow({
     KeySettings = {
         Title = "坤坤大帝脚本验证",
         Subtitle = "请输入有效密钥",
-        Note = "没有密钥?You Fool Haha😂😂😂快加入我的QQ群1057787159",
+        Note = "没有密钥？加入Discord获取",
         FileName = "StitchKey",
         SaveKey = true,
         GrabKeyFromSite = false,
@@ -177,9 +177,9 @@ local function CreateMainWindowContent()
     end
     
     Tab1:CreateButton({
-        Name = "一键复制QQ群", 
+        Name = "一键复制QQ号", 
         Callback = function() 
-            local success = CopyToClipboard("1057787159")
+            local success = CopyToClipboard("913348285")
             ShowCopyNotification(success, "913348285")
         end
     })
@@ -1334,46 +1334,9 @@ local function CreateMainWindowContent()
         loadstring(game:HttpGet("https://rawscripts.net/raw/Universal-Script-Super-ring-Parts-V6-28581"))()
     end})
 
--- 俄亥俄州 Tab
-    local Tab15 = Window:CreateTab("俄亥俄州", 7733979610)
-    Tab15:CreateButton({Name = "XA俄亥俄州", Callback = function()
-        loadstring(game:HttpGet("https://raw.githubusercontent.com/Xingtaiduan/Script/refs/heads/main/Games/俄亥俄州.lua"))()
-    end})
-
--- 墨水游戏 Tab
-    local Tab16 = Window:CreateTab("墨水游戏", 7733979610)
-    Tab16:CreateButton({Name = "XA墨水游戏", Callback = function()
-        loadstring(game:HttpGet("https://raw.githubusercontent.com/Xingtaiduan/Script/refs/heads/main/Games/墨水游戏.lua"))()
-    end})
-
--- 99夜 Tab
-    local Tab17 = Window:CreateTab("99夜", 7733979610)
-    Tab17:CreateButton({Name = "XA99夜", Callback = function()
-        loadstring(game:HttpGet("https://raw.githubusercontent.com/Xingtaiduan/Script/refs/heads/main/Games/森林中的99夜.lua"))()
-    end})
-
--- doors Tab
-    local Tab18 = Window:CreateTab("droos", 7733979610)
-    Tab18:CreateButton({Name = "doors汉化", Callback = function()
-    loadstring(game:HttpGet("\104\116\116\112\115\58\47\47\112\97\115\116\101\98\105\110\46\99\111\109\47\114\97\119\47\54\53\84\119\84\56\106\97"))()
-    end})
-
--- 烂梗社区 Tab
-    local Tab19 = Window:CreateTab("烂梗社区", 7733979610)
-    Tab19:CreateButton({Name = "烂梗社区刷钱", Callback = function()
-
-loadstring(game:HttpGet(('https://raw.githubusercontent.com/XOTRXONY/EasyScript/main/Suao.luau'),true))()
-    end})
-
--- 河北唐县 Tab
-    local Tab20 = Window:CreateTab("河北唐县", 7733979610)
-    Tab20:CreateButton({Name = "叶脚本刷钱", Callback = function()
-        loadstring(game:HttpGet("https://raw.githubusercontent.com/roblox-ye/QQ515966991/refs/heads/main/YE%20SCRIPT-Tang%20County%2C%20Hebei.lua"))()
-    end})
-
     -- 设置Tab
-    local Tab21 = Window:CreateTab("设置", 7733779610)
-    Tab21:CreateButton({
+    local Tab15 = Window:CreateTab("设置", 7733779610)
+    Tab15:CreateButton({
         Name = "一键复制Discord链接",
         Callback = function()
             local discordLink = "https://discord.gg/xVUf7H9M"
@@ -1395,5 +1358,6 @@ loadstring(game:HttpGet(('https://raw.githubusercontent.com/XOTRXONY/EasyScript/
     -- 验证通过后播放动画
     CreateKunKunAnimation()
 end
+
 -- 直接创建主窗口内容
 CreateMainWindowContent()
