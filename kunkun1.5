@@ -1364,15 +1364,9 @@ local function CreateMainWindowContent()
  993659706loadstring(game:HttpGet(('https://raw.githubusercontent.com/XOTRXONY/EasyScript/main/Suao.luau'),true))()
     end})
 
--- 河北唐县 Tab
-    local Tab20 = Window:CreateTab("河北唐县", 7733979610)
-    Tab20:CreateButton({Name = "叶脚本刷钱", Callback = function()
-        loadstring(game:HttpGet("https://raw.githubusercontent.com/roblox-ye/QQ515966991/refs/heads/main/YE%20SCRIPT-Tang%20County%2C%20Hebei.lua"))()
-    end})
-
     -- 设置Tab
-    local Tab21 = Window:CreateTab("设置", 7733779610)
-    Tab21:CreateButton({
+    local Tab20 = Window:CreateTab("设置", 7733779610)
+    Tab20:CreateButton({
         Name = "一键复制Discord链接",
         Callback = function()
             local discordLink = "https://discord.gg/xVUf7H9M"
