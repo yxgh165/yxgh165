@@ -1,5 +1,4 @@
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
-
 -- 使用 Rayfield 内置密钥系统
 local Window = Rayfield:CreateWindow({
     Name = "坤坤大帝脚本 - " .. (identifyexecutor and identifyexecutor() or "未知执行器"),
@@ -27,7 +26,7 @@ local Window = Rayfield:CreateWindow({
     }
 })
 
--- 创建背景图片函数
+-- 替换原有的CreateBackgroundImage函数：
 local function CreateBackgroundImage()
     local backgroundImage = Instance.new("ImageLabel")
     backgroundImage.Name = "BackgroundImage"
@@ -35,9 +34,20 @@ local function CreateBackgroundImage()
     backgroundImage.Size = UDim2.new(1, 0, 1, 0)
     backgroundImage.Position = UDim2.new(0, 0, 0, 0)
     backgroundImage.BackgroundTransparency = 1
-    backgroundImage.ZIndex = 0 -- 确保背景在最底层
+    backgroundImage.ZIndex = 0
     
-    -- 将背景图片添加到玩家的PlayerGui中
+    -- 添加图片加载失败处理
+    backgroundImage:GetPropertyChangedSignal("Image"):Connect(function()
+        if backgroundImage.Image == "" then
+            Rayfield:Notify({
+                Title = "背景加载失败",
+                Content = "无法加载背景图片，使用默认背景",
+                Duration = 5,
+                Image = 4483362458
+            })
+        end
+    end)
+    
     local playerGui = game.Players.LocalPlayer:WaitForChild("PlayerGui")
     backgroundImage.Parent = playerGui
     
@@ -1386,7 +1396,7 @@ local function CreateMainWindowContent()
 -- 烂梗社区 Tab
     local Tab19 = Window:CreateTab("烂梗社区", 7733979610)
     Tab19:CreateButton({Name = "烂梗社区刷钱", Callback = function()
-        -- by du8-- 交流群: loadstring(game:HttpGet(('https://raw.githubusercontent.com/XOTRXONY/EasyScript/main/Suao.luau'),true))()
+        loadstring(game:HttpGet(('https://raw.githubusercontent.com/XOTRXONY/EasyScript/main/Suao.luau'),true))()
     end})
 
 -- 河北唐县 Tab
