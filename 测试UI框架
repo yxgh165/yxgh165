@@ -1,0 +1,98 @@
+-- Wind UI 最小示例框架
+local Players = game:GetService("Players")
+local UIS     = game:GetService("UserInputService")
+local Run     = game:GetService("RunService")
+
+local player = Players.LocalPlayer
+local screen = player:WaitForChild("PlayerGui")
+
+------------------------------------------------------------------
+-- Wind.new(title) : 创建窗口
+------------------------------------------------------------------
+local Wind = {}
+Wind.__index = Wind
+
+function Wind.new(title)
+    local self = setmetatable({}, Wind)
+
+    -- 主容器
+    self.frame = Instance.new("Frame")
+    self.frame.Size = UDim2.new(0, 280, 0, 180)
+    self.frame.Position = UDim2.new(0.5, -140, 0.5, -90)
+    self.frame.AnchorPoint = Vector2.new(0.5, 0.5)
+    self.frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    self.frame.BackgroundTransparency = 0.15
+    self.frame.BorderSizePixel = 0
+    self.frame.Active = true
+    self.frame.Parent = screen
+
+    -- 标题栏
+    self.titleBar = Instance.new("Frame")
+    self.titleBar.Size = UDim2.new(1, 0, 0, 30)
+    self.titleBar.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    self.titleBar.BorderSizePixel = 0
+    self.titleBar.Parent = self.frame
+
+    -- 标题文字
+    self.titleText = Instance.new("TextLabel")
+    self.titleText.Size = UDim2.new(1, -40, 1, 0)
+    self.titleText.Position = UDim2.new(0, 8, 0, 0)
+    self.titleText.BackgroundTransparency = 1
+    self.titleText.Text = title or "Wind UI"
+    self.titleText.TextColor3 = Color3.new(1, 1, 1)
+    self.titleText.Font = Enum.Font.SourceSans
+    self.titleText.TextSize = 18
+    self.titleText.TextXAlignment = Enum.TextXAlignment.Left
+    self.titleText.Parent = self.titleBar
+
+    -- 关闭按钮
+    self.closeBtn = Instance.new("TextButton")
+    self.closeBtn.Size = UDim2.new(0, 30, 0, 30)
+    self.closeBtn.Position = UDim2.new(1, -30, 0, 0)
+    self.closeBtn.BackgroundTransparency = 1
+    self.closeBtn.Text = "✕"
+    self.closeBtn.TextColor3 = Color3.new(1, 1, 1)
+    self.closeBtn.Font = Enum.Font.SourceSans
+    self.closeBtn.TextSize = 20
+    self.closeBtn.Parent = self.titleBar
+    self.closeBtn.MouseButton1Click:Connect(function()
+        self:destroy()
+    end)
+
+    self.dragging = false
+    self.dragStart = Vector2.zero
+    self.dragOffset = Vector2.zero
+
+    -- 拖拽逻辑
+    self.titleBar.InputBegan:Connect(function(inp)
+        if inp.UserInputType == Enum.UserInputType.MouseButton1 then
+            self.dragging = true
+            self.dragStart = inp.Position
+            self.dragOffset = self.frame.AbsolutePosition
+        end
+    end)
+
+    UIS.InputChanged:Connect(function(inp)
+        if inp.UserInputType == Enum.UserInputType.MouseMovement and self.dragging then
+            local delta = inp.Position - self.dragStart
+            self.frame.Position = UDim2.new(0, self.dragOffset.X + delta.X, 0, self.dragOffset.Y + delta.Y)
+        end
+    end)
+
+    UIS.InputEnded:Connect(function(inp)
+        if inp.UserInputType == Enum.UserInputType.MouseButton1 then
+            self.dragging = false
+        end
+    end)
+
+    return self
+end
+
+function Wind:destroy()
+    self.frame:Destroy()
+end
+
+------------------------------------------------------------------
+-- 使用示例：创建一个窗口
+------------------------------------------------------------------
+local win = Wind.new("Wind UI Demo")
