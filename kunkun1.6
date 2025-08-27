@@ -1,30 +1,60 @@
--- 创建背景图片函数
 local function CreateBackground()
     local screenGui = Instance.new("ScreenGui")
     screenGui.Name = "KunKunBackground"
     screenGui.ResetOnSpawn = false
     screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    screenGui.DisplayOrder = -1 -- 确保背景在最底层
+    screenGui.DisplayOrder = 0 -- 修改为0
+    screenGui.IgnoreGuiInset = true -- 忽略GUI插入物
 
     local backgroundImage = Instance.new("ImageLabel")
     backgroundImage.Name = "Background"
-    backgroundImage.Image = "https://raw.githubusercontent.com/yxgh165/Picture-Library/main/e84262a45c4e89ac311bb600336b4e09.jpeg"
+    
+    -- 尝试使用不同的图片链接
+    backgroundImage.Image = "https://via.placeholder.com/1920x1080/333/fff?text=KunKun+Background"
+    -- 或者使用Roblox asset ID: backgroundImage.Image = "rbxassetid://您的图片ID"
+    
     backgroundImage.Size = UDim2.new(1, 0, 1, 0)
     backgroundImage.Position = UDim2.new(0, 0, 0, 0)
-    backgroundImage.BackgroundTransparency = 1
-    backgroundImage.ZIndex = 0
-    backgroundImage.ScaleType = Enum.ScaleType.Crop -- 保持图片比例并填充整个屏幕
+    backgroundImage.BackgroundColor3 = Color3.fromRGB(30, 30, 30) -- 备用背景色
+    backgroundImage.BackgroundTransparency = 0 -- 先设置为不透明以便调试
+    backgroundImage.ZIndex = 1
+    backgroundImage.ScaleType = Enum.ScaleType.Crop
     backgroundImage.Parent = screenGui
     
-    -- 添加到玩家界面
+    -- 添加调试文本
+    local debugText = Instance.new("TextLabel")
+    debugText.Text = "背景已加载 - 如果看不到图片请检查链接"
+    debugText.Size = UDim2.new(1, 0, 0.1, 0)
+    debugText.Position = UDim2.new(0, 0, 0.45, 0)
+    debugText.TextColor3 = Color3.new(1, 1, 1)
+    debugText.BackgroundTransparency = 1
+    debugText.ZIndex = 2
+    debugText.Parent = screenGui
+    
+    -- 等待PlayerGui完全加载
     local playerGui = game.Players.LocalPlayer:WaitForChild("PlayerGui")
+    task.wait(1) -- 额外等待时间
+    
     screenGui.Parent = playerGui
+    
+    -- 延迟检查图片是否加载成功
+    task.delay(3, function()
+        if backgroundImage.Image == "" then
+            debugText.Text = "图片加载失败! 请更换图片链接"
+            backgroundImage.BackgroundColor3 = Color3.fromRGB(60, 0, 0) -- 红色背景表示错误
+        else
+            debugText.Text = "背景图片已成功加载"
+            backgroundImage.BackgroundTransparency = 1 -- 恢复透明
+            task.wait(2)
+            debugText:Destroy() -- 移除调试文本
+        end
+    end)
     
     return backgroundImage
 end
 
--- 在脚本开始时创建背景
-local background = CreateBackground()
+-- 然后加载Rayfield
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 -- 使用 Rayfield 内置密钥系统
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
