@@ -1,0 +1,300 @@
+------------------------------------------------------------------
+-- 防 429 补丁：缓存 + 指数退避
+------------------------------------------------------------------
+local MarketplaceService = game:GetService("MarketplaceService")
+local productCache = {}   -- id -> info
+local lastFetch  = {}     -- id -> timestamp
+local retryAfter = {}     -- id -> seconds
+local CACHE_TTL  = 300    -- 5 分钟
+local MAX_RETRY  = 4      -- 最多 4 次退避
+
+-- 指数退避表（秒）
+local backoff = {1, 2, 4, 8}
+
+-- 安全 GetProductInfo
+local function safeGetProductInfo(id)
+    local now = tick()
+    -- 缓存有效
+    if productCache[id] and now - (lastFetch[id] or 0) < CACHE_TTL then
+        return productCache[id]
+    end
+    -- 退避中
+    if retryAfter[id] and now < retryAfter[id] then
+        return productCache[id]
+    end
+    -- 请求
+    local ok, info = pcall(function()
+        return MarketplaceService:GetProductInfo(id)
+    end)
+    if ok then
+        productCache[id] = info
+        lastFetch[id]    = now
+        retryAfter[id]   = nil
+        return info
+    else
+        -- 失败：指数退避
+        local attempt = (retryAfter[id] and 1 or 0) + 1
+        if attempt <= MAX_RETRY then
+            retryAfter[id] = now + backoff[attempt]
+        else
+            retryAfter[id] = now + CACHE_TTL  -- 长冷却
+        end
+        warn("GetProductInfo failed for", id, "→ retry after", retryAfter[id] - now, "s")
+        return productCache[id]  -- 返回旧缓存
+    end
+end
+
+-- 对外暴露：Wind.GetProductInfo = safeGetProductInfo
+Wind.GetProductInfo = safeGetProductInfo-- Wind UI 扩展框架（单文件）
+local Players = game:GetService("Players")
+local UIS     = game:GetService("UserInputService")
+local Run     = game:GetService("RunService")
+
+local player = Players.LocalPlayer
+local screen = player:WaitForChild("PlayerGui")
+
+------------------------------------------------------------------
+-- 主题配置
+------------------------------------------------------------------
+local Themes = {
+    Dark   = { bg = Color3.fromRGB(30,30,30),  bar = Color3.fromRGB(50,50,50),  text = Color3.new(1,1,1) },
+    Light  = { bg = Color3.fromRGB(240,240,240),bar=Color3.fromRGB(220,220,220),text=Color3.new(0,0,0) },
+    Dracula= { bg = Color3.fromRGB(40,42,54),  bar = Color3.fromRGB(68,71,90),  text = Color3.fromRGB(248,248,242) }
+}
+
+------------------------------------------------------------------
+-- WindWindow：主窗口
+------------------------------------------------------------------
+local Wind = {}
+Wind.__index = Wind
+
+function Wind.new(title, themeName)
+    local self = setmetatable({}, Wind)
+    self.theme = Themes[themeName or "Dark"]
+
+    -- 根 Frame
+    self.frame = Instance.new("Frame")
+    self.frame.Size = UDim2.new(0, 300, 0, 220)
+    self.frame.Position = UDim2.new(0.5, -150, 0.5, -110)
+    self.frame.AnchorPoint = Vector2.new(0.5,0.5)
+    self.frame.BackgroundColor3 = self.theme.bg
+    self.frame.BorderSizePixel = 0
+    self.frame.Active = true
+    self.frame.Parent = screen
+
+    -- 标题栏
+    self.titleBar = Instance.new("Frame")
+    self.titleBar.Size = UDim2.new(1,0,0,30)
+    self.titleBar.BackgroundColor3 = self.theme.bar
+    self.titleBar.BorderSizePixel = 0
+    self.titleBar.Parent = self.frame
+
+    -- 标题文字
+    self.titleText = Instance.new("TextLabel")
+    self.titleText.Size = UDim2.new(1,-80,1,0)
+    self.titleText.Position = UDim2.new(0,8,0,0)
+    self.titleText.BackgroundTransparency = 1
+    self.titleText.Text = title
+    self.titleText.TextColor3 = self.theme.text
+    self.titleText.Font = Enum.Font.SourceSans
+    self.titleText.TextSize = 18
+    self.titleText.TextXAlignment = Enum.TextXAlignment.Left
+    self.titleText.Parent = self.titleBar
+
+    -- 最小化按钮
+    self.minBtn = Instance.new("TextButton")
+    self.minBtn.Size = UDim2.new(0,25,0,25)
+    self.minBtn.Position = UDim2.new(1,-55,0,2)
+    self.minBtn.BackgroundTransparency = 1
+    self.minBtn.Text = "–"
+    self.minBtn.TextColor3 = self.theme.text
+    self.minBtn.TextSize = 22
+    self.minBtn.Parent = self.titleBar
+    self.minBtn.MouseButton1Click:Connect(function() self:minimize() end)
+
+    -- 关闭按钮
+    self.closeBtn = Instance.new("TextButton")
+    self.closeBtn.Size = UDim2.new(0,25,0,25)
+    self.closeBtn.Position = UDim2.new(1,-25,0,2)
+    self.closeBtn.BackgroundTransparency = 1
+    self.closeBtn.Text = "✕"
+    self.closeBtn.TextColor3 = self.theme.text
+    self.closeBtn.TextSize = 20
+    self.closeBtn.Parent = self.titleBar
+    self.closeBtn.MouseButton1Click:Connect(function() self:destroy() end)
+
+    -- 内容容器
+    self.content = Instance.new("Frame")
+    self.content.Size = UDim2.new(1,0,1,-30)
+    self.content.Position = UDim2.new(0,0,0,30)
+    self.content.BackgroundTransparency = 1
+    self.content.Parent = self.frame
+
+    -- 拖动、置顶
+    self:makeDraggable()
+    return self
+end
+
+------------------------------------------------------------------
+-- 窗口行为
+------------------------------------------------------------------
+function Wind:makeDraggable()
+    local dragging, startPos, offset
+    self.titleBar.InputBegan:Connect(function(inp)
+        if inp.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            startPos = inp.Position
+            offset = self.frame.AbsolutePosition
+        end
+    end)
+    UIS.InputChanged:Connect(function(inp)
+        if dragging and inp.UserInputType == Enum.UserInputType.MouseMovement then
+            local delta = inp.Position - startPos
+            self.frame.Position = UDim2.new(0, offset.X + delta.X, 0, offset.Y + delta.Y)
+        end
+    end)
+    UIS.InputEnded:Connect(function(inp)
+        if inp.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
+    end)
+    self.frame.ZIndex = 10
+end
+
+function Wind:minimize()
+    self.content.Visible = not self.content.Visible
+end
+
+function Wind:destroy()
+    self.frame:Destroy()
+end
+
+------------------------------------------------------------------
+-- 控件工厂
+------------------------------------------------------------------
+local function createBase(self, class, props)
+    local obj = Instance.new(class)
+    for k,v in pairs(props) do obj[k] = v end
+    obj.Parent = self.content
+    return obj
+end
+
+function Wind:Label(text)
+    return createBase(self, "TextLabel", {
+        Size = UDim2.new(1, -10, 0, 20),
+        BackgroundTransparency = 1,
+        Text = text,
+        TextColor3 = self.theme.text,
+        Font = Enum.Font.SourceSans,
+        TextSize = 16,
+        TextXAlignment = Enum.TextXAlignment.Left
+    })
+end
+
+function Wind:Button(text, callback)
+    local btn = createBase(self, "TextButton", {
+        Size = UDim2.new(1, -10, 0, 30),
+        BackgroundColor3 = self.theme.bar,
+        BorderSizePixel = 0,
+        Text = text,
+        TextColor3 = self.theme.text,
+        Font = Enum.Font.SourceSans,
+        TextSize = 16
+    })
+    btn.MouseButton1Click:Connect(callback)
+    return btn
+end
+
+function Wind:Toggle(text, default, callback)
+    local box = createBase(self, "Frame", {
+        Size = UDim2.new(1, -10, 0, 30),
+        BackgroundColor3 = self.theme.bar,
+        BorderSizePixel = 0
+    })
+    local sw = createBase(self, "TextButton", {
+        Size = UDim2.new(0, 50, 1, 0),
+        Position = UDim2.new(1, -55, 0, 0),
+        BackgroundColor3 = Color3.fromRGB(180, 180, 180),
+        Text = default and "ON" or "OFF",
+        TextColor3 = Color3.new(1, 1, 1),
+        Font = Enum.Font.SourceSans,
+        TextSize = 14
+    })
+    sw.Parent = box
+    local lbl = createBase(self, "TextLabel", {
+        Size = UDim2.new(1, -60, 1, 0),
+        BackgroundTransparency = 1,
+        Text = text,
+        TextColor3 = self.theme.text,
+        Font = Enum.Font.SourceSans,
+        TextSize = 16,
+        TextXAlignment = Enum.TextXAlignment.Left
+    })
+    lbl.Parent = box
+    sw.MouseButton1Click:Connect(function()
+        default = not default
+        sw.Text = default and "ON" or "OFF"
+        sw.BackgroundColor3 = default and Color3.fromRGB(0, 170, 0) or Color3.fromRGB(180, 180, 180)
+        callback(default)
+    end)
+    return box
+end
+
+function Wind:Slider(text, min, max, default, callback)
+    local holder = createBase(self, "Frame", { Size = UDim2.new(1, -10, 0, 40), BackgroundTransparency = 1 })
+    local lbl = createBase(self, "TextLabel", {
+        Size = UDim2.new(1, 0, 0, 20),
+        BackgroundTransparency = 1,
+        Text = text .. ": " .. default,
+        TextColor3 = self.theme.text,
+        Font = Enum.Font.SourceSans,
+        TextSize = 16,
+        TextXAlignment = Enum.TextXAlignment.Left
+    })
+    lbl.Parent = holder
+    local slide = createBase(self, "TextButton", {
+        Size = UDim2.new(1, 0, 0, 20),
+        Position = UDim2.new(0, 0, 0, 20),
+        BackgroundColor3 = Color3.fromRGB(100, 100, 100),
+        BorderSizePixel = 0,
+        Text = ""
+    })
+    slide.Parent = holder
+    local inner = createBase(self, "Frame", {
+        Size = UDim2.new((default - min) / (max - min), 0, 1, 0),
+        BackgroundColor3 = Color3.fromRGB(0, 170, 255),
+        BorderSizePixel = 0
+    })
+    inner.Parent = slide
+    slide.MouseButton1Down:Connect(function(x)
+        local percent = math.clamp((x - slide.AbsolutePosition.X) / slide.AbsoluteSize.X, 0, 1)
+        local val = min + (max - min) * percent
+        inner.Size = UDim2.new(percent, 0, 1, 0)
+        lbl.Text = text .. ": " .. math.floor(val)
+        callback(val)
+    end)
+    return holder
+end
+
+function Wind:Input(text, callback)
+    local box = createBase(self, "TextBox", {
+        Size = UDim2.new(1, -10, 0, 30),
+        BackgroundColor3 = self.theme.bar,
+        BorderSizePixel = 0,
+        PlaceholderText = text,
+        TextColor3 = self.theme.text,
+        Font = Enum.Font.SourceSans,
+        TextSize = 16
+    })
+    box.FocusLost:Connect(function() callback(box.Text) end)
+    return box
+end
+
+------------------------------------------------------------------
+-- 演示
+------------------------------------------------------------------
+local win = Wind.new("Wind UI 扩展", "Dracula")
+
+win:Label("欢迎使用 Wind UI")
+win:Button("打印 Hello", function() print("Hello from Wind UI!") end)
+win:Toggle("自动跑", false, function(v) print("Auto run =", v) end)
+win:Slider("速度", 10, 200, 50, function(v) print("Speed =", v) end)
+win:Input("输入名称", function(t) print("Name =", t) end)
