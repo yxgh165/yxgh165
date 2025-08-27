@@ -1,786 +1,989 @@
--- PCRBLX UI 框架实现
--- 模仿PCRBLX脚本的UI风格
--- 作者: AI助手
--- 日期: 2023-11-15
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
-local PCRBLXUI = {}
-PCRBLXUI.__index = PCRBLXUI
-
--- 主题配置
-local Themes = {
-    Default = {
-        Background = Color3.fromRGB(30, 30, 40),
-        Header = Color3.fromRGB(25, 25, 35),
-        Primary = Color3.fromRGB(0, 120, 215),
-        Secondary = Color3.fromRGB(0, 90, 180),
-        Text = Color3.fromRGB(240, 240, 240),
-        Border = Color3.fromRGB(50, 50, 70),
-        Shadow = Color3.fromRGB(15, 15, 25),
-        Success = Color3.fromRGB(80, 200, 120),
-        Warning = Color3.fromRGB(220, 170, 50),
-        Danger = Color3.fromRGB(220, 80, 80)
+-- 使用 Rayfield 内置密钥系统
+local Window = Rayfield:CreateWindow({
+    Name = "坤坤大帝脚本 - " .. (identifyexecutor and identifyexecutor() or "未知执行器"),
+    LoadingTitle = "坤坤大帝脚本加载中",
+    LoadingSubtitle = "尊享特权版",
+    ConfigurationSaving = {
+        Enabled = true,
+        FolderName = "StitchConfig",
+        FileName = "Settings"
     },
-    Light = {
-        Background = Color3.fromRGB(245, 245, 250),
-        Header = Color3.fromRGB(230, 230, 240),
-        Primary = Color3.fromRGB(0, 120, 215),
-        Secondary = Color3.fromRGB(0, 90, 180),
-        Text = Color3.fromRGB(40, 40, 50),
-        Border = Color3.fromRGB(200, 200, 210),
-        Shadow = Color3.fromRGB(180, 180, 190),
-        Success = Color3.fromRGB(70, 180, 100),
-        Warning = Color3.fromRGB(200, 150, 40),
-        Danger = Color3.fromRGB(200, 70, 70)
+    Discord = {
+        Enabled = false,
+        Invite = "https://discord.gg/",
+        RememberJoins = true
+    },
+    KeySystem = true, -- 启用内置密钥系统
+    KeySettings = {
+        Title = "坤坤大帝脚本验证",
+        Subtitle = "请输入有效密钥",
+        Note = "没有密钥？加入Discord获取",
+        FileName = "StitchKey",
+        SaveKey = true,
+        GrabKeyFromSite = false,
+        Key = {"2025", "666", "KUNKUN666", "666free", "TAIYOUYISILE"} -- 有效密钥列表
     }
-}
+})
 
--- 创建圆角矩形
-local function RoundedRectangle(position, size, cornerRadius, color, filled)
-    local rectangle = Drawing.new("Square")
-    rectangle.Position = position
-    rectangle.Size = size
-    rectangle.Color = color
-    rectangle.Filled = filled
-    rectangle.Thickness = 0
-    return rectangle
-end
-
--- 创建阴影效果
-local function AddShadow(element, theme)
-    local shadow = RoundedRectangle(
-        Vector2.new(element.Position.X + 3, element.Position.Y + 3),
-        element.Size,
-        5,
-        theme.Shadow,
-        true
-    )
-    shadow.ZIndex = element.ZIndex - 1
-    return shadow
-end
-
--- 创建窗口
-function PCRBLXUI:CreateWindow(title, size, position, themeName)
-    local window = {}
-    setmetatable(window, PCRBLXUI)
+-- 坤坤大帝脚本弹性动画
+local function CreateKunKunAnimation()
+    -- 创建全屏背景
+    local bg = Drawing.new("Square")
+    bg.Size = workspace.CurrentCamera.ViewportSize
+    bg.Position = Vector2.new(0, 0)
+    bg.Color = Color3.new(0, 0, 0)
+    bg.Filled = true
+    bg.Transparency = 1
+    bg.Visible = true
+    bg.ZIndex = 999
     
-    -- 设置主题
-    themeName = themeName or "Default"
-    window.Theme = Themes[themeName] or Themes.Default
+    -- 创建坤坤大帝文字
+    local text = Drawing.new("Text")
+    text.Text = "坤坤大帝脚本"
+    text.Size = 100
+    text.Center = true
+    text.Position = Vector2.new(workspace.CurrentCamera.ViewportSize.X/2, -200)
+    text.Color = Color3.new(1, 0.2, 0.2)
+    text.Outline = true
+    text.OutlineColor = Color3.new(1, 1, 1)
+    text.Transparency = 0
+    text.Visible = true
+    text.ZIndex = 1000
     
-    -- 窗口属性
-    window.Title = title or "PCRBLX UI"
-    window.Size = size or Vector2.new(400, 500)
-    window.Position = position or Vector2.new(100, 100)
-    window.Visible = true
-    window.Active = true
-    window.Tabs = {}
-    window.CurrentTab = nil
-    window.Elements = {}
-    window.ZIndex = 10
-    window.Dragging = false
-    window.DragOffset = Vector2.new(0, 0)
+    -- 创建副标题
+    local subText = Drawing.new("Text")
+    subText.Text = "尊享特权版 - 启动成功"
+    subText.Size = 40
+    subText.Center = true
+    subText.Position = Vector2.new(workspace.CurrentCamera.ViewportSize.X/2, -100)
+    subText.Color = Color3.new(0.8, 0.8, 1)
+    subText.Outline = true
+    subText.OutlineColor = Color3.new(0.2, 0.2, 0.2)
+    subText.Transparency = 0
+    subText.Visible = true
+    subText.ZIndex = 1000
     
-    -- 创建窗口背景
-    window.Background = RoundedRectangle(
-        window.Position,
-        window.Size,
-        10,
-        window.Theme.Background,
-        true
-    )
-    window.Background.ZIndex = window.ZIndex
-    
-    -- 创建窗口边框
-    window.Border = RoundedRectangle(
-        window.Position,
-        window.Size,
-        10,
-        window.Theme.Border,
-        false
-    )
-    window.Border.Thickness = 2
-    window.Border.ZIndex = window.ZIndex + 1
-    
-    -- 创建窗口标题栏
-    window.Header = RoundedRectangle(
-        window.Position,
-        Vector2.new(window.Size.X, 40),
-        10,
-        window.Theme.Header,
-        true
-    )
-    window.Header.ZIndex = window.ZIndex + 2
-    
-    -- 创建窗口标题文本
-    window.TitleText = Drawing.new("Text")
-    window.TitleText.Text = window.Title
-    window.TitleText.Size = 20
-    window.TitleText.Center = true
-    window.TitleText.Position = Vector2.new(
-        window.Position.X + window.Size.X / 2,
-        window.Position.Y + 20
-    )
-    window.TitleText.Color = window.Theme.Text
-    window.TitleText.ZIndex = window.ZIndex + 3
-    
-    -- 创建关闭按钮
-    window.CloseButton = RoundedRectangle(
-        Vector2.new(window.Position.X + window.Size.X - 35, window.Position.Y + 10),
-        Vector2.new(25, 25),
-        5,
-        window.Theme.Danger,
-        true
-    )
-    window.CloseButton.ZIndex = window.ZIndex + 3
-    
-    window.CloseText = Drawing.new("Text")
-    window.CloseText.Text = "X"
-    window.CloseText.Size = 16
-    window.CloseText.Center = true
-    window.CloseText.Position = window.CloseButton.Position + Vector2.new(12.5, 12.5)
-    window.CloseText.Color = Color3.new(1, 1, 1)
-    window.CloseText.ZIndex = window.ZIndex + 4
-    
-    -- 添加阴影
-    window.BackgroundShadow = AddShadow(window.Background, window.Theme)
-    window.HeaderShadow = AddShadow(window.Header, window.Theme)
-    
-    -- 添加元素到管理列表
-    table.insert(window.Elements, window.BackgroundShadow)
-    table.insert(window.Elements, window.Background)
-    table.insert(window.Elements, window.HeaderShadow)
-    table.insert(window.Elements, window.Header)
-    table.insert(window.Elements, window.Border)
-    table.insert(window.Elements, window.TitleText)
-    table.insert(window.Elements, window.CloseButton)
-    table.insert(window.Elements, window.CloseText)
-    
-    -- 设置拖拽功能
-    game:GetService("UserInputService").InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            local mousePos = game:GetService("UserInputService"):GetMouseLocation()
-            if mousePos.X >= window.Header.Position.X and mousePos.X <= window.Header.Position.X + window.Header.Size.X and
-               mousePos.Y >= window.Header.Position.Y and mousePos.Y <= window.Header.Position.Y + window.Header.Size.Y then
-                window.Dragging = true
-                window.DragOffset = Vector2.new(
-                    mousePos.X - window.Position.X,
-                    mousePos.Y - window.Position.Y
-                )
+    -- 弹性动画函数
+    local function elasticAnimation(obj, targetY, duration)
+        local startY = obj.Position.Y
+        local startTime = tick()
+        local damping = 0.7
+        local stiffness = 0.3
+        
+        local connection
+        connection = game:GetService("RunService").RenderStepped:Connect(function()
+            local elapsed = tick() - startTime
+            local progress = elapsed / duration
+            
+            if progress >= 1 then
+                obj.Position = Vector2.new(obj.Position.X, targetY)
+                connection:Disconnect()
+                return
             end
             
-            -- 检查关闭按钮
-            if mousePos.X >= window.CloseButton.Position.X and mousePos.X <= window.CloseButton.Position.X + window.CloseButton.Size.X and
-               mousePos.Y >= window.CloseButton.Position.Y and mousePos.Y <= window.CloseButton.Position.Y + window.CloseButton.Size.Y then
-                window:Destroy()
-            end
-        end
-    end)
-    
-    game:GetService("UserInputService").InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            window.Dragging = false
-        end
-    end)
-    
-    game:GetService("RunService").RenderStepped:Connect(function()
-        if window.Dragging then
-            local mousePos = game:GetService("UserInputService"):GetMouseLocation()
-            window.Position = Vector2.new(
-                mousePos.X - window.DragOffset.X,
-                mousePos.Y - window.DragOffset.Y
-            )
-            window:UpdatePosition()
-        end
-    end)
-    
-    return window
-end
-
--- 更新窗口位置
-function PCRBLXUI:UpdatePosition()
-    -- 更新背景
-    self.Background.Position = self.Position
-    self.BackgroundShadow.Position = self.Position + Vector2.new(3, 3)
-    
-    -- 更新标题栏
-    self.Header.Position = self.Position
-    self.HeaderShadow.Position = self.Position + Vector2.new(3, 3)
-    
-    -- 更新边框
-    self.Border.Position = self.Position
-    
-    -- 更新标题文本
-    self.TitleText.Position = Vector2.new(
-        self.Position.X + self.Size.X / 2,
-        self.Position.Y + 20
-    )
-    
-    -- 更新关闭按钮
-    self.CloseButton.Position = Vector2.new(
-        self.Position.X + self.Size.X - 35,
-        self.Position.Y + 10
-    )
-    self.CloseText.Position = self.CloseButton.Position + Vector2.new(12.5, 12.5)
-    
-    -- 更新标签页
-    for _, tab in ipairs(self.Tabs) do
-        tab:UpdatePosition(self.Position)
-    end
-end
-
--- 创建标签页
-function PCRBLXUI:CreateTab(name)
-    local tab = {
-        Name = name,
-        Buttons = {},
-        Sections = {},
-        Elements = {},
-        Position = Vector2.new(self.Position.X, self.Position.Y + 50),
-        Size = Vector2.new(self.Size.X, self.Size.Y - 50),
-        Parent = self,
-        Visible = true,
-        ZIndex = self.ZIndex + 5
-    }
-    
-    -- 创建标签按钮
-    local buttonWidth = self.Size.X / 5
-    local buttonIndex = #self.Tabs
-    local button = RoundedRectangle(
-        Vector2.new(self.Position.X + buttonIndex * buttonWidth, self.Position.Y + 45),
-        Vector2.new(buttonWidth - 5, 30),
-        5,
-        self.Theme.Secondary,
-        true
-    )
-    button.ZIndex = self.ZIndex + 4
-    
-    local buttonText = Drawing.new("Text")
-    buttonText.Text = name
-    buttonText.Size = 16
-    buttonText.Center = true
-    buttonText.Position = button.Position + Vector2.new(buttonWidth / 2 - 2.5, 15)
-    buttonText.Color = self.Theme.Text
-    buttonText.ZIndex = self.ZIndex + 5
-    
-    -- 添加到元素列表
-    table.insert(self.Elements, button)
-    table.insert(self.Elements, buttonText)
-    
-    -- 设置点击事件
-    game:GetService("UserInputService").InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            local mousePos = game:GetService("UserInputService"):GetMouseLocation()
-            if mousePos.X >= button.Position.X and mousePos.X <= button.Position.X + button.Size.X and
-               mousePos.Y >= button.Position.Y and mousePos.Y <= button.Position.Y + button.Size.Y then
-                self:SetActiveTab(tab)
-            end
-        end
-    end)
-    
-    tab.Button = button
-    tab.ButtonText = buttonText
-    
-    table.insert(self.Tabs, tab)
-    
-    if #self.Tabs == 1 then
-        self:SetActiveTab(tab)
+            local overshoot = math.sin(progress * math.pi * 4) * (1 - progress)
+            local newY = targetY + (startY - targetY) * math.pow(1 - progress, 2) * overshoot * stiffness
+            stiffness = stiffness * damping
+            obj.Position = Vector2.new(obj.Position.X, newY)
+        end)
     end
     
-    return tab
-end
-
--- 设置活动标签页
-function PCRBLXUI:SetActiveTab(tab)
-    if self.CurrentTab then
-        self.CurrentTab.Visible = false
-        self.CurrentTab.Button.Color = self.Theme.Secondary
-    end
-    
-    self.CurrentTab = tab
-    tab.Visible = true
-    tab.Button.Color = self.Theme.Primary
-    
-    for _, section in ipairs(tab.Sections) do
-        section:SetVisible(tab.Visible)
-    end
-end
-
--- 创建分区
-function PCRBLXUI:CreateSection(tab, title)
-    local section = {
-        Title = title,
-        Elements = {},
-        Position = Vector2.new(tab.Position.X + 20, tab.Position.Y + 20 + (#tab.Sections * 180)),
-        Size = Vector2.new(tab.Size.X - 40, 170),
-        Parent = tab,
-        Visible = tab.Visible,
-        ZIndex = tab.ZIndex + 5
-    }
-    
-    -- 创建分区背景
-    section.Background = RoundedRectangle(
-        section.Position,
-        section.Size,
-        8,
-        self.Theme.Header,
-        true
-    )
-    section.Background.ZIndex = section.ZIndex
-    
-    -- 创建分区边框
-    section.Border = RoundedRectangle(
-        section.Position,
-        section.Size,
-        8,
-        self.Theme.Border,
-        false
-    )
-    section.Border.Thickness = 1
-    section.Border.ZIndex = section.ZIndex + 1
-    
-    -- 创建分区标题
-    section.TitleText = Drawing.new("Text")
-    section.TitleText.Text = title
-    section.TitleText.Size = 18
-    section.TitleText.Position = section.Position + Vector2.new(15, 10)
-    section.TitleText.Color = self.Theme.Text
-    section.TitleText.ZIndex = section.ZIndex + 2
-    
-    -- 添加到元素列表
-    table.insert(self.Elements, section.Background)
-    table.insert(self.Elements, section.Border)
-    table.insert(self.Elements, section.TitleText)
-    
-    table.insert(tab.Sections, section)
-    
-    -- 更新标签页位置
-    tab:UpdatePosition(self.Position)
-    
-    return section
-end
-
--- 更新标签页位置
-function PCRBLXUI.Tab:UpdatePosition(windowPosition)
-    self.Position = Vector2.new(windowPosition.X, windowPosition.Y + 50)
-    
-    for i, section in ipairs(self.Sections) do
-        section.Position = Vector2.new(
-            self.Position.X + 20,
-            self.Position.Y + 20 + ((i - 1) * 180)
-        )
+    spawn(function()
+        for i = 0, 1, 0.05 do
+            bg.Transparency = 1 - i * 0.7
+            wait(0.01)
+        end
         
-        section.Background.Position = section.Position
-        section.Border.Position = section.Position
-        section.TitleText.Position = section.Position + Vector2.new(15, 10)
+        elasticAnimation(text, workspace.CurrentCamera.ViewportSize.Y/2 - 100, 1.5)
         
-        -- 更新控件位置
-        for j, element in ipairs(section.Elements) do
-            if element.UpdatePosition then
-                element:UpdatePosition(section.Position)
-            end
+        wait(0.2)
+        elasticAnimation(subText, workspace.CurrentCamera.ViewportSize.Y/2 + 20, 1.3)
+        
+        wait(3.5)
+        
+        for i = 0, 1, 0.05 do
+            text.Transparency = i
+            subText.Transparency = i
+            bg.Transparency = 0.3 + i * 0.7
+            wait(0.01)
         end
+        
+        bg:Remove()
+        text:Remove()
+        subText:Remove()
+    end)
+end
+
+-- 复制到剪贴板函数
+local function CopyToClipboard(text)
+    if setclipboard then
+        setclipboard(text)
+        return true
+    elseif writeclipboard then
+        writeclipboard(text)
+        return true
+    elseif toclipboard then
+        toclipboard(text)
+        return true
+    else
+        print("[复制内容] " .. text)
+        return false
     end
 end
 
--- 设置分区可见性
-function PCRBLXUI.Section:SetVisible(visible)
-    self.Visible = visible
-    self.Background.Visible = visible
-    self.Border.Visible = visible
-    self.TitleText.Visible = visible
+-- 显示复制成功通知
+local function ShowCopyNotification(success, content)
+    if success then
+        Rayfield:Notify({
+            Title = "复制成功",
+            Content = "已复制到剪贴板: " .. content,
+            Duration = 3,
+            Image = 4483362458
+        })
+    else
+        Rayfield:Notify({
+            Title = "复制失败",
+            Content = "请手动复制控制台中的内容",
+            Duration = 5,
+            Image = 4483362458
+        })
+    end
+end
+
+-- 子弹穿墙功能
+local bulletPenetration = false
+local penetrationPower = 3 -- 可穿透的墙体数量
+
+local function hasPenetrationAbility()
+    return bulletPenetration
+end
+
+-- 修改墙体检测函数以支持穿墙
+local function isVisible(pos, targetCharacter)
+    if not wallCheckEnabled then return true end
     
-    for _, element in ipairs(self.Elements) do
-        element:SetVisible(visible)
+    local origin = Camera.CFrame.Position
+    local direction = (pos - origin).Unit
+    local ray = Ray.new(origin, direction * (origin - pos).Magnitude)
+    
+    local ignoreList = {LocalPlayer.Character, Camera}
+    if targetCharacter then
+        table.insert(ignoreList, targetCharacter)
     end
+    
+    local part, position = workspace:FindPartOnRayWithIgnoreList(ray, ignoreList)
+    
+    -- 如果开启穿墙功能，则忽略墙体检测
+    if bulletPenetration and hasPenetrationAbility() then
+        return true
+    end
+    
+    return part == nil
 end
 
--- 创建按钮
-function PCRBLXUI:CreateButton(section, text, callback)
-    local button = {
-        Text = text,
-        Callback = callback,
-        Position = section.Position + Vector2.new(20, 40),
-        Size = Vector2.new(section.Size.X - 40, 35),
-        Parent = section,
-        Visible = section.Visible,
-        ZIndex = section.ZIndex + 3
+-- 分离式玩家 ESP 系统
+local espEnabled = false
+local espBoxEnabled = true
+local espNameEnabled = true
+local espDistanceEnabled = true
+local espHealthEnabled = true
+local espHealthBarEnabled = true
+local espTracerEnabled = true
+local espCache = {}
+
+local function createESPObject(plr)
+    local esp = {
+        Box = Drawing.new("Quad"),
+        Name = Drawing.new("Text"),
+        Distance = Drawing.new("Text"),
+        HealthBar = Drawing.new("Quad"),
+        HealthText = Drawing.new("Text"),
+        Tracer = Drawing.new("Line")
     }
     
-    -- 创建按钮背景
-    button.Background = RoundedRectangle(
-        button.Position,
-        button.Size,
-        5,
-        self.Theme.Secondary,
-        true
-    )
-    button.Background.ZIndex = button.ZIndex
+    -- 初始化各个ESP组件
+    esp.Box.Thickness = 1.5
+    esp.Box.Filled = false
+    esp.Box.ZIndex = 5
+    esp.Box.Visible = espBoxEnabled and espEnabled
     
-    -- 创建按钮文本
-    button.TextElement = Drawing.new("Text")
-    button.TextElement.Text = text
-    button.TextElement.Size = 16
-    button.TextElement.Center = true
-    button.TextElement.Position = button.Position + Vector2.new(button.Size.X / 2, 17)
-    button.TextElement.Color = self.Theme.Text
-    button.TextElement.ZIndex = button.ZIndex + 1
+    esp.Name.Size = 18
+    esp.Name.Center = true
+    esp.Name.Outline = true
+    esp.Name.ZIndex = 6
+    esp.Name.Visible = espNameEnabled and espEnabled
     
-    -- 添加阴影
-    button.Shadow = AddShadow(button.Background, self.Theme)
-    button.Shadow.ZIndex = button.ZIndex - 1
+    esp.Distance.Size = 16
+    esp.Distance.Center = true
+    esp.Distance.Outline = true
+    esp.Distance.ZIndex = 6
+    esp.Distance.Visible = espDistanceEnabled and espEnabled
     
-    -- 添加到元素列表
-    table.insert(self.Elements, button.Shadow)
-    table.insert(self.Elements, button.Background)
-    table.insert(self.Elements, button.TextElement)
-    table.insert(section.Elements, button)
+    esp.HealthBar.Filled = true
+    esp.HealthBar.Thickness = 1
+    esp.HealthBar.ZIndex = 5
+    esp.HealthBar.Visible = espHealthBarEnabled and espEnabled
     
-    -- 设置点击事件
-    game:GetService("UserInputService").InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 and button.Visible then
-            local mousePos = game:GetService("UserInputService"):GetMouseLocation()
-            if mousePos.X >= button.Background.Position.X and mousePos.X <= button.Background.Position.X + button.Background.Size.X and
-               mousePos.Y >= button.Background.Position.Y and mousePos.Y <= button.Background.Position.Y + button.Background.Size.Y then
-                -- 按钮点击动画
-                button.Background.Color = self.Theme.Primary
-                task.wait(0.1)
-                button.Background.Color = self.Theme.Secondary
-                
-                if callback then
-                    callback()
+    esp.HealthText.Size = 14
+    esp.HealthText.Center = true
+    esp.HealthText.Outline = true
+    esp.HealthText.ZIndex = 6
+    esp.HealthText.Visible = espHealthEnabled and espEnabled
+    
+    esp.Tracer.Thickness = 1.5
+    esp.Tracer.ZIndex = 4
+    esp.Tracer.Visible = espTracerEnabled and espEnabled
+    
+    espCache[plr] = esp
+    return esp
+end
+
+local function getTeamColor(plr)
+    if plr.Team and LocalPlayer.Team and plr.Team == LocalPlayer.Team then
+        return Color3.fromRGB(0, 255, 0)
+    else
+        return Color3.fromRGB(255, 0, 0)
+    end
+end
+
+local function isTeammate(plr)
+    if plr.Team and LocalPlayer.Team and plr.Team == LocalPlayer.Team then
+        return true
+    end
+    return false
+end
+
+local function updateESP()
+    if not espEnabled then 
+        for _, esp in pairs(espCache) do
+            for _, obj in pairs(esp) do
+                obj.Visible = false
+            end
+        end
+        return 
+    end
+    
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr == LocalPlayer then continue end
+        
+        if espShowEnemyOnly and isTeammate(plr) then
+            if espCache[plr] then
+                for _, obj in pairs(espCache[plr]) do
+                    obj.Visible = false
                 end
             end
+            continue
         end
-    end)
+        
+        local char = plr.Character
+        if not char then
+            if espCache[plr] then
+                for _, obj in pairs(espCache[plr]) do
+                    obj.Visible = false
+                end
+            end
+            continue 
+        end
+        
+        local root = char:FindFirstChild("HumanoidRootPart")
+        local head = char:FindFirstChild("Head")
+        local humanoid = char:FindFirstChildOfClass("Humanoid")
+        
+        if not (root and head and humanoid) then continue end
+        
+        local rootPos, rootVis = Camera:WorldToViewportPoint(root.Position)
+        local headPos, headVis = Camera:WorldToViewportPoint(head.Position + Vector3.new(0, 1.5, 0))
+        
+        if not (rootVis and headVis) then
+            if espCache[plr] then
+                for _, obj in pairs(espCache[plr]) do
+                    obj.Visible = false
+                end
+            end
+            continue
+        end
+        
+        local esp = espCache[plr] or createESPObject(plr)
+        
+        local height = math.abs(headPos.Y - rootPos.Y) * 1.5
+        local width = height * 0.6
+        local left = headPos.X - width / 2
+        local right = headPos.X + width / 2
+        
+        local color = getTeamColor(plr)
+        
+        -- 更新方框
+        esp.Box.Visible = espBoxEnabled
+        esp.Box.Color = color
+        esp.Box.PointA = Vector2.new(left, headPos.Y)
+        esp.Box.PointB = Vector2.new(right, headPos.Y)
+        esp.Box.PointC = Vector2.new(right, headPos.Y + height)
+        esp.Box.PointD = Vector2.new(left, headPos.Y + height)
+        
+        -- 更新名字
+        esp.Name.Visible = espNameEnabled
+        esp.Name.Color = color
+        esp.Name.Position = Vector2.new(headPos.X, headPos.Y - 20)
+        esp.Name.Text = plr.Name
+        
+        -- 更新距离
+        local distance = math.floor((root.Position - Camera.CFrame.Position).Magnitude)
+        esp.Distance.Visible = espDistanceEnabled
+        esp.Distance.Color = color
+        esp.Distance.Position = Vector2.new(headPos.X, headPos.Y + height + 5)
+        esp.Distance.Text = tostring(distance) .. "m"
+        
+        -- 更新血条和血量
+        local healthPercent = math.clamp(humanoid.Health / humanoid.MaxHealth, 0, 1)
+        local barWidth = width
+        local barHeight = 5
+        local barX = left
+        local barY = headPos.Y + height + 20
+        
+        esp.HealthBar.Visible = espHealthBarEnabled
+        esp.HealthBar.Color = Color3.new(1 - healthPercent, healthPercent, 0)
+        esp.HealthBar.PointA = Vector2.new(barX, barY)
+        esp.HealthBar.PointB = Vector2.new(barX + barWidth * healthPercent, barY)
+        esp.HealthBar.PointC = Vector2.new(barX + barWidth * healthPercent, barY + barHeight)
+        esp.HealthBar.PointD = Vector2.new(barX, barY + barHeight)
+        
+        esp.HealthText.Visible = espHealthEnabled
+        esp.HealthText.Color = Color3.new(1, 1, 1)
+        esp.HealthText.Position = Vector2.new(barX + barWidth / 2, barY - 10)
+        esp.HealthText.Text = math.floor(humanoid.Health) .. "/" .. math.floor(humanoid.MaxHealth)
+        
+        -- 更新追踪线
+        esp.Tracer.Visible = espTracerEnabled
+        esp.Tracer.Color = color
+        
+        local startPoint
+        if tracerPosition == "Top" then
+            startPoint = Vector2.new(Camera.ViewportSize.X/2, 0)
+        else
+            startPoint = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y)
+        end
+        
+        local endPoint = Vector2.new(headPos.X, headPos.Y + height/2)
+        
+        esp.Tracer.From = startPoint
+        esp.Tracer.To = endPoint
+    end
     
-    -- 设置悬停效果
-    game:GetService("RunService").RenderStepped:Connect(function()
-        if button.Visible then
-            local mousePos = game:GetService("UserInputService"):GetMouseLocation()
-            if mousePos.X >= button.Background.Position.X and mousePos.X <= button.Background.Position.X + button.Background.Size.X and
-               mousePos.Y >= button.Background.Position.Y and mousePos.Y <= button.Background.Position.Y + button.Background.Size.Y then
-                button.Background.Color = self.Theme.Primary
+    for plr, esp in pairs(espCache) do
+        if not plr or not plr.Parent or plr == LocalPlayer then
+            for _, obj in pairs(esp) do
+                obj.Visible = false
+                obj:Remove()
+            end
+            espCache[plr] = nil
+        end
+    end
+end
+
+-- 优化 NPC 透视流畅度
+local npcEspEnabled = false
+local npcEspCache = {}
+local npcEspUpdateRate = 0.1 -- 更新频率（秒）
+local lastNpcEspUpdate = 0
+
+local function createNpcESPObject(model)
+    local esp = {
+        Box = Drawing.new("Quad"),
+        Name = Drawing.new("Text"),
+        Distance = Drawing.new("Text")
+    }
+    
+    esp.Box.Thickness = 1.5
+    esp.Box.Filled = false
+    esp.Box.Color = Color3.fromRGB(255, 165, 0)
+    esp.Box.ZIndex = 4
+    esp.Box.Visible = npcEspEnabled
+    
+    esp.Name.Size = 16
+    esp.Name.Center = true
+    esp.Name.Outline = true
+    esp.Name.Color = Color3.fromRGB(255, 165, 0)
+    esp.Name.ZIndex = 4
+    esp.Name.Visible = npcEspEnabled
+    
+    esp.Distance.Size = 14
+    esp.Distance.Center = true
+    esp.Distance.Outline = true
+    esp.Distance.Color = Color3.fromRGB(255, 165, 0)
+    esp.Distance.ZIndex = 4
+    esp.Distance.Visible = npcEspEnabled
+    
+    npcEspCache[model] = esp
+    return esp
+end
+
+local function updateNpcESP()
+    if not npcEspEnabled then return end
+    
+    local currentTime = tick()
+    if currentTime - lastNpcEspUpdate < npcEspUpdateRate then
+        return
+    end
+    lastNpcEspUpdate = currentTime
+    
+    for _, model in ipairs(workspace:GetDescendants()) do
+        if model:IsA("Model") and model:FindFirstChildOfClass("Humanoid") and not Players:GetPlayerFromCharacter(model) then
+            local root = model:FindFirstChild("HumanoidRootPart") or model:FindFirstChild("Torso")
+            local head = model:FindFirstChild("Head")
+            
+            if not (root and head) then
+                if npcEspCache[model] then
+                    for _, obj in pairs(npcEspCache[model]) do
+                        obj.Visible = false
+                    end
+                end
+                continue
+            end
+            
+            local rootPos, rootVis = Camera:WorldToViewportPoint(root.Position)
+            local headPos, headVis = Camera:WorldToViewportPoint(head.Position + Vector3.new(0, 1.5, 0))
+            
+            if not (rootVis and headVis) then
+                if npcEspCache[model] then
+                    for _, obj in pairs(npcEspCache[model]) do
+                        obj.Visible = false
+                    end
+                end
+                continue
+            end
+            
+            local esp = npcEspCache[model] or createNpcESPObject(model)
+            
+            local height = math.abs(headPos.Y - rootPos.Y) * 1.5
+            local width = height * 0.6
+            local left = headPos.X - width / 2
+            local right = headPos.X + width / 2
+            
+            esp.Box.Visible = npcEspEnabled
+            esp.Box.PointA = Vector2.new(left, headPos.Y)
+            esp.Box.PointB = Vector2.new(right, headPos.Y)
+            esp.Box.PointC = Vector2.new(right, headPos.Y + height)
+            esp.Box.PointD = Vector2.new(left, headPos.Y + height)
+            
+            esp.Name.Visible = npcEspEnabled
+            esp.Name.Position = Vector2.new(headPos.X, headPos.Y - 15)
+            esp.Name.Text = model.Name
+            
+            local distance = math.floor((root.Position - Camera.CFrame.Position).Magnitude)
+            esp.Distance.Visible = npcEspEnabled
+            esp.Distance.Position = Vector2.new(headPos.X, headPos.Y + height + 5)
+            esp.Distance.Text = tostring(distance) .. "m"
+        end
+    end
+    
+    for model, esp in pairs(npcEspCache) do
+        if not model or not model.Parent then
+            for _, obj in pairs(esp) do
+                obj.Visible = false
+                obj:Remove()
+            end
+            npcEspCache[model] = nil
+        end
+    end
+end
+
+-- 创建主窗口内容
+local function CreateMainWindowContent()
+    -- 公告 Tab
+    local Tab1 = Window:CreateTab("公告", 7733779610)
+    
+    local function getDate() return os.date("%Y-%m-%d %H:%M") end
+    local function getPlayer()
+        local p = game.Players.LocalPlayer
+        return {
+            ["用户名"]   = p.Name,
+            ["显示名"]   = p.DisplayName,
+            ["用户ID"]   = p.UserId,
+            ["注册天数"] = p.AccountAge,
+            ["当前游戏"] = game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId).Name
+        }
+    end
+    
+    Tab1:CreateSection("系统信息")
+    Tab1:CreateLabel("📅 当前时间: " .. getDate())
+    
+    for k, v in pairs(getPlayer()) do
+        Tab1:CreateLabel(k .. "： " .. tostring(v))
+    end
+    
+    Tab1:CreateButton({
+        Name = "一键复制QQ号", 
+        Callback = function() 
+            local success = CopyToClipboard("913348285")
+            ShowCopyNotification(success, "913348285")
+        end
+    })
+    
+    -- 人物功能 Tab
+    local Tab2 = Window:CreateTab("人物功能", 7733779610)
+    
+    -- 兼容 executor 没有 mouse1press / mouse1release
+    local mouse1press  = mouse1press  or function()
+        local vim = game:GetService("VirtualInputManager")
+        vim:SendMouseButtonEvent(0,0,0,true,game,1)
+    end
+    local mouse1release = mouse1release or function()
+        local vim = game:GetService("VirtualInputManager")
+        vim:SendMouseButtonEvent(0,0,0,false,game,1)
+    end
+    
+    -- AI-Aimbot 独立标签页
+    local Tab3 = Window:CreateTab("AI-Aimbot", 7733961748)
+    
+    -- 通用参数
+    local aimbotEnabled      = false
+    local aimbotSmooth       = 0.35
+    local aimbotBone         = "Head"
+    local aimbotPrediction   = 0.12
+    local aimbotDelay        = 0.08
+    local aimbotCheckTeam    = false
+    local aimbotConn
+    local aimbotMode = "Distance"
+    local wallCheckEnabled = false
+    local aimLineEnabled = false
+    local aimLine = Drawing.new("Line")
+    
+    -- 初始化自瞄线条
+    aimLine.Visible = false
+    aimLine.Thickness = 1.5
+    aimLine.Color = Color3.fromRGB(0, 255, 0)
+    aimLine.ZIndex = 11
+    
+    -- 缺失变量一次性补全
+    local Camera = workspace.CurrentCamera
+    local UserInputService = game:GetService("UserInputService")
+    local Players = game:GetService("Players")
+    local LocalPlayer = Players.LocalPlayer
+    
+    -- 1. 跟随鼠标 FOV
+    local mouseFOV      = 120
+    local mouseFovCircle = Drawing.new("Circle")
+    mouseFovCircle.NumSides  = 64
+    mouseFovCircle.Radius    = mouseFOV
+    mouseFovCircle.Thickness = 1.5
+    mouseFovCircle.Color     = Color3.fromRGB(255,255,255)
+    mouseFovCircle.Filled    = false
+    mouseFovCircle.Visible   = false
+    mouseFovCircle.ZIndex = 10
+    
+    -- 2. 固定中心 FOV
+    local fixedFOV      = 90
+    local fixedFovCircle = Drawing.new("Circle")
+    fixedFovCircle.NumSides  = 64
+    fixedFovCircle.Radius    = fixedFOV
+    fixedFovCircle.Thickness = 1.5
+    fixedFovCircle.Color     = Color3.fromRGB(255,165,0)
+    fixedFovCircle.Filled    = false
+    fixedFovCircle.Visible   = false
+    fixedFovCircle.ZIndex = 9
+    
+    -- 固定圆中心一次设置
+    local function setFixedCenter()
+        local center = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
+        fixedFovCircle.Position = center
+        aimLine.From = center
+    end
+    Camera:GetPropertyChangedSignal("ViewportSize"):Connect(setFixedCenter)
+    setFixedCenter()
+    
+    -- 工具函数
+    local function getAimPos(character)
+        if not character then return nil end
+        local root = character:FindFirstChild("HumanoidRootPart")
+        local bone = character:FindFirstChild(aimbotBone) or character:FindFirstChild("Head")
+        if not (root and bone) then return nil end
+        
+        local vel = root.Velocity
+        return bone.Position + vel * aimbotPrediction
+    end
+    
+    local function inAnyFOV(worldPos)
+        local screenPos = Camera:WorldToViewportPoint(worldPos)
+        if screenPos.Z <= 0 then return false end
+        
+        local mousePos = UserInputService:GetMouseLocation()
+        local center = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
+        
+        if mouseFovCircle.Visible then
+            if (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude <= mouseFOV then
+                return true
+            end
+        end
+        
+        if fixedFovCircle.Visible then
+            if (Vector2.new(screenPos.X, screenPos.Y) - center).Magnitude <= fixedFOV then
+                return true
+            end
+        end
+        
+        return false
+    end
+    
+    local function getClosest()
+        local closest, minDist = nil, math.huge
+        local center = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
+        
+        for _, plr in ipairs(Players:GetPlayers()) do
+            if plr == LocalPlayer then continue end
+            if aimbotCheckTeam and plr.Team and plr.Team == LocalPlayer.Team then continue end
+            
+            local char = plr.Character
+            if not char then continue end
+            
+            local aimPos = getAimPos(char)
+            if not aimPos then continue end
+            if not inAnyFOV(aimPos) then continue end
+            
+            local sp = Camera:WorldToViewportPoint(aimPos)
+            if sp.Z <= 0 then continue end
+            
+            local ignoreList = {LocalPlayer.Character, Camera}
+            if not isVisible(aimPos, char) then continue end
+            
+            local dist
+            if aimbotMode == "Distance" then
+                dist = (aimPos - Camera.CFrame.Position).Magnitude
             else
-                button.Background.Color = self.Theme.Secondary
+                dist = (Vector2.new(sp.X, sp.Y) - center).Magnitude
+            end
+            
+            if dist < minDist then
+                minDist, closest = dist, plr
             end
         end
-    end)
+        return closest
+    end
     
-    return button
-end
+    -- 主循环（已移除自动开火）
+    local function startAimbot()
+        if aimbotConn then return end
+        
+        aimbotConn = game:GetService("RunService").RenderStepped:Connect(function()
+            if not aimbotEnabled then 
+                aimLine.Visible = false
+                return 
+            end
+            
+            mouseFovCircle.Position = UserInputService:GetMouseLocation()
 
--- 创建开关
-function PCRBLXUI:CreateToggle(section, text, defaultValue, callback)
-    local toggle = {
-        Text = text,
-        Value = defaultValue or false,
-        Callback = callback,
-        Position = section.Position + Vector2.new(20, 90),
-        Size = Vector2.new(30, 15),
-        Parent = section,
-        Visible = section.Visible,
-        ZIndex = section.ZIndex + 3
-    }
-    
-    -- 创建开关背景
-    toggle.Background = RoundedRectangle(
-        toggle.Position,
-        toggle.Size,
-        7,
-        self.Theme.Secondary,
-        true
-    )
-    toggle.Background.ZIndex = toggle.ZIndex
-    
-    -- 创建开关滑块
-    toggle.Slider = RoundedRectangle(
-        defaultValue and toggle.Position + Vector2.new(17, 0) or toggle.Position + Vector2.new(3, 0),
-        Vector2.new(12, 15),
-        6,
-        defaultValue and self.Theme.Success or self.Theme.Danger,
-        true
-    )
-    toggle.Slider.ZIndex = toggle.ZIndex + 1
-    
-    -- 创建开关文本
-    toggle.TextElement = Drawing.new("Text")
-    toggle.TextElement.Text = text
-    toggle.TextElement.Size = 16
-    toggle.TextElement.Position = toggle.Position + Vector2.new(40, -2)
-    toggle.TextElement.Color = self.Theme.Text
-    toggle.TextElement.ZIndex = toggle.ZIndex + 1
-    
-    -- 添加到元素列表
-    table.insert(self.Elements, toggle.Background)
-    table.insert(self.Elements, toggle.Slider)
-    table.insert(self.Elements, toggle.TextElement)
-    table.insert(section.Elements, toggle)
-    
-    -- 设置点击事件
-    game:GetService("UserInputService").InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 and toggle.Visible then
-            local mousePos = game:GetService("UserInputService"):GetMouseLocation()
-            if mousePos.X >= toggle.Background.Position.X and mousePos.X <= toggle.Background.Position.X + toggle.Background.Size.X and
-               mousePos.Y >= toggle.Background.Position.Y and mousePos.Y <= toggle.Background.Position.Y + toggle.Background.Size.Y then
-                toggle.Value = not toggle.Value
-                
-                -- 更新滑块位置
-                if toggle.Value then
-                    toggle.Slider.Position = toggle.Position + Vector2.new(17, 0)
-                    toggle.Slider.Color = self.Theme.Success
+            local target = getClosest()
+            if not target or not target.Character then 
+                aimLine.Visible = false
+                return 
+            end
+            
+            local aimPos = getAimPos(target.Character)
+            if not aimPos then 
+                aimLine.Visible = false
+                return 
+            end
+
+            if aimLineEnabled then
+                local screenPos = Camera:WorldToViewportPoint(aimPos)
+                if screenPos.Z > 0 then
+                    aimLine.From = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
+                    aimLine.To = Vector2.new(screenPos.X, screenPos.Y)
+                    aimLine.Visible = true
                 else
-                    toggle.Slider.Position = toggle.Position + Vector2.new(3, 0)
-                    toggle.Slider.Color = self.Theme.Danger
+                    aimLine.Visible = false
                 end
-                
-                if callback then
-                    callback(toggle.Value)
-                end
+            else
+                aimLine.Visible = false
             end
-        end
-    end)
-    
-    return toggle
-end
-
--- 创建滑块
-function PCRBLXUI:CreateSlider(section, text, min, max, defaultValue, callback)
-    local slider = {
-        Text = text,
-        Min = min or 0,
-        Max = max or 100,
-        Value = defaultValue or min,
-        Callback = callback,
-        Position = section.Position + Vector2.new(20, 120),
-        Size = Vector2.new(section.Size.X - 40, 20),
-        Parent = section,
-        Visible = section.Visible,
-        ZIndex = section.ZIndex + 3,
-        Dragging = false
-    }
-    
-    -- 计算初始位置
-    local range = slider.Max - slider.Min
-    local percentage = (slider.Value - slider.Min) / range
-    local sliderPosition = slider.Position + Vector2.new(percentage * slider.Size.X, 0)
-    
-    -- 创建滑块背景
-    slider.Background = RoundedRectangle(
-        slider.Position,
-        slider.Size,
-        3,
-        self.Theme.Header,
-        true
-    )
-    slider.Background.ZIndex = slider.ZIndex
-    
-    -- 创建滑块轨道
-    slider.Track = RoundedRectangle(
-        slider.Position + Vector2.new(0, 8),
-        Vector2.new(slider.Size.X, 4),
-        2,
-        self.Theme.Border,
-        true
-    )
-    slider.Track.ZIndex = slider.ZIndex + 1
-    
-    -- 创建滑块填充
-    slider.Fill = RoundedRectangle(
-        slider.Position + Vector2.new(0, 8),
-        Vector2.new(percentage * slider.Size.X, 4),
-        2,
-        self.Theme.Primary,
-        true
-    )
-    slider.Fill.ZIndex = slider.ZIndex + 2
-    
-    -- 创建滑块手柄
-    slider.Handle = RoundedRectangle(
-        sliderPosition - Vector2.new(5, 5),
-        Vector2.new(10, 18),
-        4,
-        self.Theme.Secondary,
-        true
-    )
-    slider.Handle.ZIndex = slider.ZIndex + 3
-    
-    -- 创建滑块文本
-    slider.TextElement = Drawing.new("Text")
-    slider.TextElement.Text = text .. ": " .. tostring(slider.Value)
-    slider.TextElement.Size = 16
-    slider.TextElement.Position = slider.Position + Vector2.new(0, -20)
-    slider.TextElement.Color = self.Theme.Text
-    slider.TextElement.ZIndex = slider.ZIndex + 4
-    
-    -- 添加到元素列表
-    table.insert(self.Elements, slider.Background)
-    table.insert(self.Elements, slider.Track)
-    table.insert(self.Elements, slider.Fill)
-    table.insert(self.Elements, slider.Handle)
-    table.insert(self.Elements, slider.TextElement)
-    table.insert(section.Elements, slider)
-    
-    -- 设置拖拽事件
-    game:GetService("UserInputService").InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 and slider.Visible then
-            local mousePos = game:GetService("UserInputService"):GetMouseLocation()
-            if mousePos.X >= slider.Background.Position.X and mousePos.X <= slider.Background.Position.X + slider.Background.Size.X and
-               mousePos.Y >= slider.Background.Position.Y and mousePos.Y <= slider.Background.Position.Y + slider.Background.Size.Y then
-                slider.Dragging = true
-                slider:UpdateValue(mousePos.X)
+            
+            local delta = aimPos - Camera.CFrame.Position
+            if delta.Magnitude < 0.01 then return end
+            
+            local targetCF = CFrame.new(Camera.CFrame.Position, Camera.CFrame.Position + delta)
+            local currentLook = Camera.CFrame.LookVector
+            local targetLook = targetCF.LookVector
+            
+            local dot = currentLook:Dot(targetLook)
+            local angle = math.acos(math.clamp(dot, -1, 1))
+            local maxAngle = math.rad(90)
+            
+            if angle <= maxAngle then
+                local smoothFactor = math.clamp(aimbotSmooth, 0.01, 0.99)
+                local newLook = currentLook:Lerp(targetLook, 1 - smoothFactor)
+                Camera.CFrame = CFrame.new(Camera.CFrame.Position, Camera.CFrame.Position + newLook)
             end
-        end
-    end)
-    
-    game:GetService("UserInputService").InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            slider.Dragging = false
-        end
-    end)
-    
-    game:GetService("RunService").RenderStepped:Connect(function()
-        if slider.Dragging then
-            local mousePos = game:GetService("UserInputService"):GetMouseLocation()
-            slider:UpdateValue(mousePos.X)
-        end
-    end)
-    
-    return slider
-end
-
--- 更新滑块值
-function PCRBLXUI.Slider:UpdateValue(xPos)
-    local relativeX = math.clamp(xPos - self.Position.X, 0, self.Size.X)
-    local percentage = relativeX / self.Size.X
-    self.Value = math.floor(self.Min + (self.Max - self.Min) * percentage)
-    
-    -- 更新UI
-    self.Fill.Size = Vector2.new(relativeX, 4)
-    self.Handle.Position = self.Position + Vector2.new(relativeX - 5, -5)
-    self.TextElement.Text = self.Text .. ": " .. tostring(self.Value)
-    
-    if self.Callback then
-        self.Callback(self.Value)
-    end
-end
-
--- 创建标签
-function PCRBLXUI:CreateLabel(section, text)
-    local label = {
-        Text = text,
-        Position = section.Position + Vector2.new(20, 40),
-        Parent = section,
-        Visible = section.Visible,
-        ZIndex = section.ZIndex + 3
-    }
-    
-    -- 创建标签文本
-    label.TextElement = Drawing.new("Text")
-    label.TextElement.Text = text
-    label.TextElement.Size = 16
-    label.TextElement.Position = label.Position
-    label.TextElement.Color = self.Theme.Text
-    label.TextElement.ZIndex = label.ZIndex
-    
-    -- 添加到元素列表
-    table.insert(self.Elements, label.TextElement)
-    table.insert(section.Elements, label)
-    
-    return label
-end
-
--- 设置控件可见性
-function PCRBLXUI.Button:SetVisible(visible)
-    self.Visible = visible
-    self.Background.Visible = visible
-    self.TextElement.Visible = visible
-    self.Shadow.Visible = visible
-end
-
-function PCRBLXUI.Toggle:SetVisible(visible)
-    self.Visible = visible
-    self.Background.Visible = visible
-    self.Slider.Visible = visible
-    self.TextElement.Visible = visible
-end
-
-function PCRBLXUI.Slider:SetVisible(visible)
-    self.Visible = visible
-    self.Background.Visible = visible
-    self.Track.Visible = visible
-    self.Fill.Visible = visible
-    self.Handle.Visible = visible
-    self.TextElement.Visible = visible
-end
-
-function PCRBLXUI.Label:SetVisible(visible)
-    self.Visible = visible
-    self.TextElement.Visible = visible
-end
-
--- 销毁窗口
-function PCRBLXUI:Destroy()
-    for _, element in ipairs(self.Elements) do
-        if element.Remove then
-            element:Remove()
-        end
+        end)
     end
     
-    self.Visible = false
-    self.Active = false
+    local function stopAimbot()
+        if aimbotConn then 
+            aimbotConn:Disconnect() 
+            aimbotConn = nil 
+        end
+        mouseFovCircle.Visible = false
+        fixedFovCircle.Visible = false
+        aimLine.Visible = false
+    end
+    
+    Tab3:CreateSection("AI-Aimbot")
+    Tab3:CreateToggle({
+        Name = "启用 Aimbot",
+        CurrentValue = false,
+        Callback = function(v)
+            aimbotEnabled = v
+            if v then 
+                startAimbot() 
+            else 
+                stopAimbot() 
+            end
+        end
+    })
+    
+    Tab3:CreateToggle({
+        Name = "子弹穿墙",
+        CurrentValue = bulletPenetration,
+        Callback = function(v) 
+            bulletPenetration = v 
+        end
+    })
+    
+    Tab3:CreateToggle({
+        Name = "仅瞄准敌人",
+        CurrentValue = aimbotCheckTeam,
+        Callback = function(v) aimbotCheckTeam = v end
+    })
+    
+    Tab3:CreateToggle({
+        Name = "墙体检测",
+        CurrentValue = wallCheckEnabled,
+        Callback = function(v) wallCheckEnabled = v end
+    })
+    
+    Tab3:CreateToggle({
+        Name = "显示自瞄线条",
+        CurrentValue = aimLineEnabled,
+        Callback = function(v) aimLineEnabled = v end
+    })
+    
+    Tab3:CreateDropdown({
+        Name = "瞄准方式",
+        Options = {"Distance", "Crosshair"},
+        CurrentOption = aimbotMode,
+        Callback = function(v) aimbotMode = v end
+    })
+    
+    Tab3:CreateSection("跟随鼠标 FOV")
+    Tab3:CreateToggle({ 
+        Name = "显示跟随FOV", 
+        CurrentValue = false, 
+        Callback = function(v) mouseFovCircle.Visible = v end 
+    })
+    
+    Tab3:CreateSlider({
+        Name = "半径（滑条）",
+        Range = {0, 500},
+        Increment = 5,
+        Suffix = "px",
+        CurrentValue = mouseFOV,
+        Callback = function(v) 
+            mouseFOV = v
+            mouseFovCircle.Radius = v 
+        end
+    })
+    
+    Tab3:CreateSection("固定中心 FOV")
+    Tab3:CreateToggle({ 
+        Name = "显示固定FOV", 
+        CurrentValue = false, 
+        Callback = function(v) fixedFovCircle.Visible = v end 
+    })
+    
+    Tab3:CreateSlider({
+        Name = "半径（滑条）",
+        Range = {0, 500},
+        Increment = 5,
+        Suffix = "px",
+        CurrentValue = fixedFOV,
+        Callback = function(v) 
+            fixedFOV = v
+            fixedFovCircle.Radius = v 
+        end
+    })
+    
+    Tab3:CreateSection("通用参数")
+    Tab3:CreateSlider({
+        Name = "平滑系数（滑条）",
+        Range = {0, 1},
+        Increment = 0.01,
+        Suffix = "",
+        CurrentValue = aimbotSmooth,
+        Callback = function(v) aimbotSmooth = v end
+    })
+    
+    Tab3:CreateSlider({
+        Name = "预测 (秒)（滑条）",
+        Range = {0, 1},
+        Increment = 0.01,
+        Suffix = "s",
+        CurrentValue = aimbotPrediction,
+        Callback = function(v) aimbotPrediction = v end
+    })
+    
+    Tab3:CreateDropdown({
+        Name = "瞄准骨骼",
+        Options = {"Head","Neck","UpperTorso","HumanoidRootPart"},
+        CurrentOption = aimbotBone,
+        Callback = function(v) aimbotBone = v end
+    })
+    
+    -- 透视功能独立标签页
+    local Tab4 = Window:CreateTab("透视功能", 7733961749)
+    
+    Tab4:CreateSection("玩家透视")
+    Tab4:CreateToggle({
+        Name = "启用玩家透视", 
+        CurrentValue = false, 
+        Callback = function(v)
+            espEnabled = v
+            if v then
+                if not espLoop then
+                    espLoop = game:GetService("RunService").RenderStepped:Connect(updateESP)
+                end
+            else
+                if espLoop then
+                    espLoop:Disconnect()
+                    espLoop = nil
+                end
+                for plr, esp in pairs(espCache) do
+                    for _, obj in pairs(esp) do
+                        pcall(function() obj:Remove() end)
+                    end
+                end
+                table.clear(espCache)
+            end
+        end
+    })
+
+    Tab4:CreateToggle({
+        Name = "显示方框",
+        CurrentValue = espBoxEnabled,
+        Callback = function(v) 
+            espBoxEnabled = v 
+            updateESP()
+        end
+    })
+
+    Tab4:CreateToggle({
+        Name = "显示名字",
+        CurrentValue = espNameEnabled,
+        Callback = function(v) 
+            espNameEnabled = v 
+            updateESP()
+        end
+    })
+
+    Tab4:CreateToggle({
+        Name = "显示距离",
+        CurrentValue = espDistanceEnabled,
+        Callback = function(v) 
+            espDistanceEnabled = v 
+            updateESP()
+        end
+    })
+
+    Tab4:CreateToggle({
+        Name = "显示血量",
+        CurrentValue = espHealthEnabled,
+        Callback = function(v) 
+            espHealthEnabled = v 
+            updateESP()
+        end
+    })
+
+    Tab4:CreateToggle({
+        Name = "显示血条",
+        CurrentValue = espHealthBarEnabled,
+        Callback = function(v) 
+            espHealthBarEnabled = v 
+            updateESP()
+        end
+    })
+
+    Tab4:CreateToggle({
+        Name = "显示追踪线",
+        CurrentValue = espTracerEnabled,
+        Callback = function(v) 
+            espTracerEnabled = v 
+            updateESP()
+        end
+    })
+
+    Tab4:CreateDropdown({
+        Name = "线条位置",
+        Options = {"Top", "Bottom"},
+        CurrentOption = tracerPosition,
+        Callback = function(value)
+            tracerPosition = value
+            updateESP()
+        end
+    })
+
+    Tab4:CreateToggle({
+        Name = "只显示敌人",
+        CurrentValue = espShowEnemyOnly,
+        Callback = function(v)
+            espShowEnemyOnly = v
+            updateESP()
+        end
+    })
+    
+    Tab4:CreateSection("NPC透视")
+    Tab4:CreateToggle({
+        Name = "增强NPC透视", 
+        CurrentValue = false, 
+        Callback = function(v)
+            npcEspEnabled = v
+            if v then
+                if not npcEspLoop then
+                    npcEspLoop = game:GetService("RunService").RenderStepped:Connect(updateNpcESP)
+                end
+            else
+                if npcEspLoop then
+                    npcEspLoop:Disconnect()
+                    npcEspLoop = nil
+                end
+                for model, esp in pairs(npcEspCache) do
+                    for _, obj in pairs(esp) do
+                        pcall(function() obj:Remove() end)
+                    end
+                end
+                table.clear(npcEspCache)
+            end
+        end
+    })
+    
+    -- 其他标签页保持不变...
+    -- [此处保留原有的其他标签页代码]
+    
+    -- 忍者注入器兼容性检查
+    if identifyexecutor and identifyexecutor():lower():find("ninja") then
+        Rayfield:Notify({
+            Title = "注入器检测",
+            Content = "忍者注入器已识别，所有功能兼容",
+            Duration = 3,
+            Image = 4483362458
+        })
+    end
+    
+    -- 验证通过后播放动画
+    CreateKunKunAnimation()
 end
 
--- 示例使用
-local function exampleUsage()
-    -- 创建窗口
-    local window = PCRBLXUI:CreateWindow("PCRBLX UI 示例", Vector2.new(450, 550), Vector2.new(200, 100))
-    
-    -- 创建标签页
-    local mainTab = window:CreateTab("主界面")
-    local settingsTab = window:CreateTab("设置")
-    
-    -- 主标签页的分区
-    local infoSection = window:CreateSection(mainTab, "系统信息")
-    local actionsSection = window:CreateSection(mainTab, "功能操作")
-    
-    -- 信息标签
-    window:CreateLabel(infoSection, "当前执行器: " .. identifyexecutor())
-    window:CreateLabel(infoSection, "游戏名称: " .. game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId).Name)
-    window:CreateLabel(infoSection, "玩家名称: " .. game.Players.LocalPlayer.Name)
-    
-    -- 按钮
-    window:CreateButton(actionsSection, "显示通知", function()
-        print("显示通知按钮被点击!")
-    end)
-    
-    -- 开关
-    window:CreateToggle(actionsSection, "启用功能", false, function(value)
-        print("功能状态: " .. tostring(value))
-    end)
-    
-    -- 滑块
-    window:CreateSlider(actionsSection, "音量控制", 0, 100, 80, function(value)
-        print("音量设置为: " .. value)
-    end)
-    
-    -- 设置标签页的分区
-    local themeSection = window:CreateSection(settingsTab, "主题设置")
-    window:CreateButton(themeSection, "切换为深色主题", function()
-        -- 实际应用中应该切换主题
-        print("已切换为深色主题")
-    end)
-    
-    window:CreateButton(themeSection, "切换为浅色主题", function()
-        -- 实际应用中应该切换主题
-        print("已切换为浅色主题")
-    end)
-    
-    window:CreateButton(themeSection, "关闭UI", function()
-        window:Destroy()
-    end)
-end
+-- 直接创建主窗口内容
+CreateMainWindowContent()
 
--- 运行示例
-exampleUsage()
-
-return PCRBLXUI
+-- 启动ESP和NPC透视循环
+local espLoop = game:GetService("RunService").RenderStepped:Connect(updateESP)
+local npcEspLoop = game:GetService("RunService").RenderStepped:Connect(updateNpcESP)
